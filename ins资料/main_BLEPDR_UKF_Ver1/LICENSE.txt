@@ -1,0 +1,5 @@
+本程序由matlabfilter独立开发，未经请勿转载或用于商业用途。
+如需授权合作，请联系微信：matlabfilter，可接导航和滤波方面的MATLAB程序定制，价格面议。
+
+所有代码编码格式为UTF-8，如果MATLAB代码打开是显示不了正确的中文，优先检查编码格式是否不符。修改编码方式的方法，参考：https://blog.csdn.net/callmeup/article/details/150009684
+
