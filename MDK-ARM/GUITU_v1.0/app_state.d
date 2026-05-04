@@ -48,5 +48,6 @@ guitu_v1.0\app_state.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_e
 guitu_v1.0\app_state.o: ../Core/Inc/i2c.h
 guitu_v1.0\app_state.o: ../Core/Inc/spi.h
 guitu_v1.0\app_state.o: ../Core/Inc/usart.h
+guitu_v1.0\app_state.o: ..\Core\PeripheralDriver\wit_imu.h
 guitu_v1.0\app_state.o: ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h
 guitu_v1.0\app_state.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h

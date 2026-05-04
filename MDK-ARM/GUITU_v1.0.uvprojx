@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>USE_PWR_LDO_SUPPLY,USE_HAL_DRIVER,STM32H743xx</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32H7xx/Include;../Drivers/CMSIS/Include;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Core/App;..\Core\Task</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32H7xx/Include;../Drivers/CMSIS/Include;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Core/App;..\Core\Task;..\Core\PeripheralDriver</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -1444,6 +1444,21 @@
               <FileName>task_ui.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\Core\Task\task_ui.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>PeripheralDriver</GroupName>
+          <Files>
+            <File>
+              <FileName>wit_imu.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\PeripheralDriver\wit_imu.c</FilePath>
+            </File>
+            <File>
+              <FileName>wit_imu.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Core\PeripheralDriver\wit_imu.h</FilePath>
             </File>
           </Files>
         </Group>

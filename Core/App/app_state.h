@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "app_msg.h"
+#include "wit_imu.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,9 +26,16 @@ typedef struct
 
 typedef struct
 {
+    WitImuVector3 acc_raw;       /* WIT 0x51 原始加速度：raw / 32768 * 16g */
+    WitImuVector3 gyro_raw;      /* WIT 0x52 原始角速度：raw / 32768 * 2000 deg/s */
+    WitImuVector3 angle_raw;     /* WIT 0x53 原始角度：raw / 32768 * 180 deg */
+    WitImuQuat quat_raw;         /* WIT 0x59 原始四元数：raw / 32768 */
+    int16_t temp_raw;            /* WIT 原始温度：raw / 100 degC */
     float accel_mps2[3];
     float gyro_rad_s[3];
-    float euler_rad[3];
+    float angle_deg[3];
+    float quat[4];
+    float temp_deg_c;
 } GyroFrame_t;
 
 typedef struct

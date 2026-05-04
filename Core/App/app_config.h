@@ -10,7 +10,7 @@ extern "C" {
 #include "spi.h"
 #include "usart.h"
 
-#define APP_GYRO_UART_HANDLE        huart2      /* 陀螺仪数据接收串口 (USART1) */
+#define APP_GYRO_UART_HANDLE        huart2      /* 陀螺仪数据接收串口 (USART2) */
 #define APP_DEBUG_UART_HANDLE       huart3      /* 调试日志输出串口 (USART2) */
 #define APP_UWB_UART_HANDLE         huart1      /* UWB标签卡配置串口 (USART3) ,但是没使用*/
 
@@ -22,7 +22,7 @@ extern "C" {
 
 #define APP_ADC_HANDLE              hadc1       /* 通用 ADC (电池/电压采集) */
 
-#define APP_GYRO_RX_MAX_LEN         96U         /* 单帧陀螺仪数据最大字节数 */
+#define APP_GYRO_RX_MAX_LEN         96U         /* 单次 DMA 投队列的最大字节数 */
 #define APP_GYRO_DMA_BUFFER_SIZE    APP_GYRO_RX_MAX_LEN   /* DMA 接收缓冲区大小 */
 #define APP_GYRO_QUEUE_DEPTH        16U         /* 陀螺仪接收队列深度  */
 

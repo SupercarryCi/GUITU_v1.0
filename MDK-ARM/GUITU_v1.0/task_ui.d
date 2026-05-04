@@ -52,6 +52,7 @@ guitu_v1.0\task_ui.o: ../Core/App/app_msg.h
 guitu_v1.0\task_ui.o: ../Core/App/app_rtos.h
 guitu_v1.0\task_ui.o: ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h
 guitu_v1.0\task_ui.o: ../Core/App/app_state.h
+guitu_v1.0\task_ui.o: ..\Core\PeripheralDriver\wit_imu.h
 guitu_v1.0\task_ui.o: ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h
 guitu_v1.0\task_ui.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h
 guitu_v1.0\task_ui.o: ../Core/Inc/FreeRTOSConfig.h

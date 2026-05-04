@@ -1,8 +1,7 @@
 guitu_v1.0\task_gyro.o: ..\Core\Task\task_gyro.c
 guitu_v1.0\task_gyro.o: ..\Core\Task\task_gyro.h
 guitu_v1.0\task_gyro.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
-guitu_v1.0\task_gyro.o: ../Core/App/app_config.h
-guitu_v1.0\task_gyro.o: ../Core/Inc/adc.h
+guitu_v1.0\task_gyro.o: ..\Core\PeripheralDriver\wit_imu.h
 guitu_v1.0\task_gyro.o: ../Core/Inc/main.h
 guitu_v1.0\task_gyro.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h
 guitu_v1.0\task_gyro.o: ../Core/Inc/stm32h7xx_hal_conf.h
@@ -44,6 +43,8 @@ guitu_v1.0\task_gyro.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_tim.h
 guitu_v1.0\task_gyro.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_tim_ex.h
 guitu_v1.0\task_gyro.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart.h
 guitu_v1.0\task_gyro.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h
+guitu_v1.0\task_gyro.o: ../Core/App/app_config.h
+guitu_v1.0\task_gyro.o: ../Core/Inc/adc.h
 guitu_v1.0\task_gyro.o: ../Core/Inc/i2c.h
 guitu_v1.0\task_gyro.o: ../Core/Inc/spi.h
 guitu_v1.0\task_gyro.o: ../Core/Inc/usart.h

@@ -1,0 +1,13 @@
+*.o
+*.obj
+*.elf
+*.bin
+*.map
+*.axf
+*.d
+*.hex
+*.dbg
+*.uvgui.*
+*.uvguix.*
+*.crf
+*.lnp

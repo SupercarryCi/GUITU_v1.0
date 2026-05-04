@@ -51,6 +51,7 @@ guitu_v1.0\app_rtos.o: ../Core/Inc/usart.h
 guitu_v1.0\app_rtos.o: ..\Core\App\app_event.h
 guitu_v1.0\app_rtos.o: ..\Core\App\app_msg.h
 guitu_v1.0\app_rtos.o: ..\Core\App\app_state.h
+guitu_v1.0\app_rtos.o: ..\Core\PeripheralDriver\wit_imu.h
 guitu_v1.0\app_rtos.o: ..\Core\Task\task_adc.h
 guitu_v1.0\app_rtos.o: ..\Core\Task\task_control.h
 guitu_v1.0\app_rtos.o: ..\Core\Task\task_debug.h

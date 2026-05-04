@@ -56,6 +56,7 @@
 "guitu_v1.0\task_return.o"
 "guitu_v1.0\task_spo2.o"
 "guitu_v1.0\task_ui.o"
+"guitu_v1.0\wit_imu.o"
 --strict --scatter "GUITU_v1.0\GUITU_v1.sct"
 --summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
 --info sizes --info totals --info unused --info veneers
