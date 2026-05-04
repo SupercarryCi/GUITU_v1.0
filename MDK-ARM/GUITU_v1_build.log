@@ -1,8 +1,8 @@
 *** Using Compiler 'V5.06 update 5 (build 528)', folder: 'C:\Keil_v5\ARM\ARMCC\Bin'
 Build target 'GUITU_v1.0'
-compiling task_adc.c...
-linking...
-Program Size: Code=55388 RO-data=1836 RW-data=260 ZI-data=138340  
-FromELF: creating hex file...
-"GUITU_v1.0\GUITU_v1.0" - 0 Error(s), 0 Warning(s).
-Build Time Elapsed:  00:00:11
+compiling task_gyro.c...
+"no source": Error:  #219: error while deleting file "guitu_v1.0\task_gyro.d": Permission denied
+..\Core\Task\task_gyro.c: 0 warnings, 1 error
+"GUITU_v1.0\GUITU_v1.0" - 1 Error(s), 0 Warning(s).
+Target not created.
+Build Time Elapsed:  00:00:01

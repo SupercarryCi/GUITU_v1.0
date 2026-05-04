@@ -14,6 +14,10 @@
 #include "task_spo2.h"
 #include "task_ui.h"
 
+/*
+ * RTOS 对象在这里集中创建：
+ * 任务文件只使用 extern 句柄，不负责创建队列/互斥锁/事件组。
+ */
 osEventFlagsId_t g_sysEventFlags = NULL;
 osMessageQueueId_t g_gyroRxQueue = NULL;
 osMessageQueueId_t g_uiCmdQueue = NULL;
@@ -115,7 +119,7 @@ static void InitTask(void *argument)
 
     (void)argument;
 
-    init_result = App_InitPeripherals(&done_mask);
+    init_result = App_InitPeripherals(&done_mask);   //外设初始化
     App_StateSetInitResult(done_mask, init_result);
 
     if (init_result != 0)
@@ -123,13 +127,13 @@ static void InitTask(void *argument)
         App_Error(0x1100U | ((uint32_t)(-init_result) & 0xFFU));
     }
 
-    if (App_StartRuntimeTasks() != 0)
+    if (App_StartRuntimeTasks() != 0)                //任务建立
     {
         App_Error(0x1200U);
     }
 
     osEventFlagsSet(g_sysEventFlags, SYS_EVT_INIT_DONE);
-    App_DebugLog(APP_LOG_INFO, "system init done mask=0x%08lX", (unsigned long)done_mask);
+    App_DebugLog("system init done mask=0x%08lX", (unsigned long)done_mask);
     osThreadExit();
 }
 
@@ -142,7 +146,7 @@ static int32_t App_InitPeripherals(uint32_t *done_mask)
         return -1;
     }
 
-    if (Task_GyroStartRx() != 0)
+    if (Task_GyroInitHardware() != 0)
     {
         *done_mask = mask;
         return -2;

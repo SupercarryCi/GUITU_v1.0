@@ -1,6 +1,8 @@
 guitu_v1.0\task_adc.o: ..\Core\Task\task_adc.c
 guitu_v1.0\task_adc.o: ..\Core\Task\task_adc.h
 guitu_v1.0\task_adc.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+guitu_v1.0\task_adc.o: ..\Core\Task\task_debug.h
+guitu_v1.0\task_adc.o: ../Core/App/app_msg.h
 guitu_v1.0\task_adc.o: ../Core/App/app_config.h
 guitu_v1.0\task_adc.o: ../Core/Inc/adc.h
 guitu_v1.0\task_adc.o: ../Core/Inc/main.h
@@ -48,8 +50,9 @@ guitu_v1.0\task_adc.o: ../Core/Inc/i2c.h
 guitu_v1.0\task_adc.o: ../Core/Inc/spi.h
 guitu_v1.0\task_adc.o: ../Core/Inc/usart.h
 guitu_v1.0\task_adc.o: ../Core/App/app_event.h
-guitu_v1.0\task_adc.o: ../Core/App/app_msg.h
 guitu_v1.0\task_adc.o: ../Core/App/app_rtos.h
+guitu_v1.0\task_adc.o: ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h
+guitu_v1.0\task_adc.o: ../Core/App/app_state.h
 guitu_v1.0\task_adc.o: ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h
 guitu_v1.0\task_adc.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h
 guitu_v1.0\task_adc.o: ../Core/Inc/FreeRTOSConfig.h
@@ -60,7 +63,4 @@ guitu_v1.0\task_adc.o: ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/
 guitu_v1.0\task_adc.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h
 guitu_v1.0\task_adc.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/task.h
 guitu_v1.0\task_adc.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/list.h
-guitu_v1.0\task_adc.o: ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h
-guitu_v1.0\task_adc.o: ../Core/App/app_state.h
-guitu_v1.0\task_adc.o: ../Core/Inc/ins_nav.h
 guitu_v1.0\task_adc.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h

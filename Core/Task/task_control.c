@@ -7,12 +7,15 @@
 #include "cmsis_os.h"
 #include "task_debug.h"
 
+/*
+ * ControlTask 是 UI 命令分发中心。
+ * 后续如果增加菜单、模式切换、LoRa 配置，都从这里转发到对应任务。
+ */
 static void task_control_dispatch_return(const AppCommandMsg_t *command)
 {
     ReturnCommandMsg_t return_command;
 
     return_command.id = command->id;
-    return_command.tick_ms = command->tick_ms;
     (void)osMessageQueuePut(g_returnCmdQueue, &return_command, 0U, 0U);
 }
 
@@ -22,7 +25,10 @@ void Task_ControlEntry(void *argument)
 
     (void)argument;
 
-    osEventFlagsWait(g_sysEventFlags, SYS_EVT_INIT_DONE, osFlagsWaitAny, osWaitForever);
+    osEventFlagsWait(g_sysEventFlags,
+                     SYS_EVT_INIT_DONE,
+                     osFlagsWaitAny | osFlagsNoClear,
+                     osWaitForever);
 
     for (;;)
     {
@@ -38,14 +44,17 @@ void Task_ControlEntry(void *argument)
                     break;
 
                 case APP_CMD_LORA_SEND:
-                    App_DebugLog(APP_LOG_INFO, "ui requested lora send");
+                    /* 待你完善：组织 LoRa 发送包并投递到 g_loraTxQueue。 */
+                    App_DebugLog("ui requested lora send");
                     break;
 
                 case APP_CMD_MARK_PATH_POINT:
-                    App_DebugLog(APP_LOG_INFO, "ui marked path point");
+                    /* 待你完善：把当前 NavState_t 追加到返航路径存储。 */
+                    App_DebugLog("ui marked path point");
                     break;
 
                 default:
+                    /* 待你完善：新增 UI 命令时在这里补充分发逻辑。 */
                     break;
             }
         }

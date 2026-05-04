@@ -5,9 +5,9 @@
 extern "C" {
 #endif
 
-#include "cmsis_os.h"
+#include "cmsis_os2.h"
 
-extern osEventFlagsId_t g_sysEventFlags;
+extern osEventFlagsId_t g_sysEventFlags;//л
 extern osMessageQueueId_t g_gyroRxQueue;
 extern osMessageQueueId_t g_uiCmdQueue;
 extern osMessageQueueId_t g_loraTxQueue;

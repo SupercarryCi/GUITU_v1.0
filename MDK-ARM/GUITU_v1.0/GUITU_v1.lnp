@@ -8,7 +8,6 @@
 "guitu_v1.0\i2c.o"
 "guitu_v1.0\spi.o"
 "guitu_v1.0\usart.o"
-"guitu_v1.0\ins_nav.o"
 "guitu_v1.0\stm32h7xx_it.o"
 "guitu_v1.0\stm32h7xx_hal_msp.o"
 "guitu_v1.0\stm32h7xx_hal_timebase_tim.o"

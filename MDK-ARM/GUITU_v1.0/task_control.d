@@ -50,6 +50,8 @@ guitu_v1.0\task_control.o: ../Core/Inc/i2c.h
 guitu_v1.0\task_control.o: ../Core/Inc/spi.h
 guitu_v1.0\task_control.o: ../Core/Inc/usart.h
 guitu_v1.0\task_control.o: ../Core/App/app_rtos.h
+guitu_v1.0\task_control.o: ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h
+guitu_v1.0\task_control.o: ../Core/App/app_state.h
 guitu_v1.0\task_control.o: ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h
 guitu_v1.0\task_control.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h
 guitu_v1.0\task_control.o: ../Core/Inc/FreeRTOSConfig.h
@@ -60,7 +62,4 @@ guitu_v1.0\task_control.o: ../Middlewares/Third_Party/FreeRTOS/Source/portable/R
 guitu_v1.0\task_control.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h
 guitu_v1.0\task_control.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/task.h
 guitu_v1.0\task_control.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/list.h
-guitu_v1.0\task_control.o: ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h
-guitu_v1.0\task_control.o: ../Core/App/app_state.h
-guitu_v1.0\task_control.o: ../Core/Inc/ins_nav.h
 guitu_v1.0\task_control.o: ..\Core\Task\task_debug.h

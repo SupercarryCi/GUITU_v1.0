@@ -156,7 +156,7 @@ I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart.h)(0x68C0269C)
 I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h)(0x68C0269C)
 I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h)(0x68C02609)
-I (../Core/App/app_rtos.h)(0x69F6CBC0)
+I (../Core/App/app_rtos.h)(0x69F70118)
 F (../Core/Src/adc.c)(0x69F60280)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\adc.o --omf_browse guitu_v1.0\adc.crf --depend guitu_v1.0\adc.d)
 I (../Core/Inc/adc.h)(0x69E49919)
 I (../Core/Inc/main.h)(0x69F60283)
@@ -372,11 +372,6 @@ I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_tim.h)(0x68C0269C)
 I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_tim_ex.h)(0x68C0269C)
 I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart.h)(0x68C0269C)
 I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h)(0x68C0269C)
-F (../Core/Src/ins_nav.c)(0x69E76173)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\ins_nav.o --omf_browse guitu_v1.0\ins_nav.crf --depend guitu_v1.0\ins_nav.d)
-I (../Core/Inc/ins_nav.h)(0x69E76161)
-I (C:\Keil_v5\ARM\ARMCC\include\stdint.h)(0x588B8344)
-I (C:\Keil_v5\ARM\ARMCC\include\math.h)(0x588B8344)
-I (C:\Keil_v5\ARM\ARMCC\include\string.h)(0x588B8344)
 F (../Core/Src/stm32h7xx_it.c)(0x69F60282)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\stm32h7xx_it.o --omf_browse guitu_v1.0\stm32h7xx_it.crf --depend guitu_v1.0\stm32h7xx_it.d)
 I (../Core/Inc/main.h)(0x69F60283)
 I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h)(0x68C0269C)
@@ -1711,25 +1706,15 @@ I (../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F/portmacro.h
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/task.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/list.h)(0x68C02609)
-F (..\Core\App\app_config.h)(0x69F6CBC0)()
-F (..\Core\App\app_event.h)(0x69F6CBC0)()
-F (..\Core\App\app_msg.h)(0x69F6CBC0)()
-F (..\Core\App\app_rtos.c)(0x69F6CC8F)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\app_rtos.o --omf_browse guitu_v1.0\app_rtos.crf --depend guitu_v1.0\app_rtos.d)
-I (..\Core\App\app_rtos.h)(0x69F6CBC0)
-I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h)(0x68C02609)
-I (../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h)(0x68C02609)
-I (C:\Keil_v5\ARM\ARMCC\include\stddef.h)(0x588B8344)
-I (C:\Keil_v5\ARM\ARMCC\include\stdint.h)(0x588B8344)
-I (../Core/Inc/FreeRTOSConfig.h)(0x69F6027F)
-I (../Middlewares/Third_Party/FreeRTOS/Source/include/projdefs.h)(0x68C02609)
-I (../Middlewares/Third_Party/FreeRTOS/Source/include/portable.h)(0x68C02609)
-I (../Middlewares/Third_Party/FreeRTOS/Source/include/deprecated_definitions.h)(0x68C02609)
-I (../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F/portmacro.h)(0x68C02609)
-I (../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h)(0x68C02609)
-I (../Middlewares/Third_Party/FreeRTOS/Source/include/task.h)(0x68C02609)
-I (../Middlewares/Third_Party/FreeRTOS/Source/include/list.h)(0x68C02609)
+F (..\Core\App\app_config.h)(0x69F8388C)()
+F (..\Core\App\app_event.h)(0x69F6F17A)()
+F (..\Core\App\app_msg.h)(0x69F70118)()
+F (..\Core\App\app_rtos.c)(0x69F83EB4)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\app_rtos.o --omf_browse guitu_v1.0\app_rtos.crf --depend guitu_v1.0\app_rtos.d)
+I (..\Core\App\app_rtos.h)(0x69F70118)
 I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h)(0x68C02609)
-I (..\Core\App\app_config.h)(0x69F6CBC0)
+I (C:\Keil_v5\ARM\ARMCC\include\stdint.h)(0x588B8344)
+I (C:\Keil_v5\ARM\ARMCC\include\stddef.h)(0x588B8344)
+I (..\Core\App\app_config.h)(0x69F8388C)
 I (../Core/Inc/adc.h)(0x69E49919)
 I (../Core/Inc/main.h)(0x69F60283)
 I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h)(0x68C0269C)
@@ -1773,24 +1758,23 @@ I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h)(0x68C0269C)
 I (../Core/Inc/i2c.h)(0x69F60281)
 I (../Core/Inc/spi.h)(0x69F60281)
 I (../Core/Inc/usart.h)(0x69F60282)
-I (..\Core\App\app_event.h)(0x69F6CBC0)
-I (..\Core\App\app_msg.h)(0x69F6CBC0)
-I (..\Core\App\app_state.h)(0x69F6CBC0)
-I (../Core/Inc/ins_nav.h)(0x69E76161)
+I (..\Core\App\app_event.h)(0x69F6F17A)
+I (..\Core\App\app_msg.h)(0x69F70118)
+I (..\Core\App\app_state.h)(0x69F82527)
 I (..\Core\Task\task_adc.h)(0x69F6CC8F)
 I (..\Core\Task\task_control.h)(0x69F6CC8F)
-I (..\Core\Task\task_debug.h)(0x69F6CC8F)
-I (..\Core\Task\task_gyro.h)(0x69F6CC8F)
+I (..\Core\Task\task_debug.h)(0x69F6F389)
+I (..\Core\Task\task_gyro.h)(0x69F83EB4)
 I (..\Core\Task\task_lora.h)(0x69F6CC8F)
 I (..\Core\Task\task_return.h)(0x69F6CC90)
 I (..\Core\Task\task_spo2.h)(0x69F6CC8F)
 I (..\Core\Task\task_ui.h)(0x69F6CC8F)
-F (..\Core\App\app_rtos.h)(0x69F6CBC0)()
-F (..\Core\App\app_state.c)(0x69F6CBC0)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\app_state.o --omf_browse guitu_v1.0\app_state.crf --depend guitu_v1.0\app_state.d)
-I (..\Core\App\app_state.h)(0x69F6CBC0)
+F (..\Core\App\app_rtos.h)(0x69F70118)()
+F (..\Core\App\app_state.c)(0x69F7629D)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\app_state.o --omf_browse guitu_v1.0\app_state.crf --depend guitu_v1.0\app_state.d)
+I (..\Core\App\app_state.h)(0x69F82527)
 I (C:\Keil_v5\ARM\ARMCC\include\stdint.h)(0x588B8344)
-I (..\Core\App\app_msg.h)(0x69F6CBC0)
-I (..\Core\App\app_config.h)(0x69F6CBC0)
+I (..\Core\App\app_msg.h)(0x69F70118)
+I (..\Core\App\app_config.h)(0x69F8388C)
 I (../Core/Inc/adc.h)(0x69E49919)
 I (../Core/Inc/main.h)(0x69F60283)
 I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h)(0x68C0269C)
@@ -1835,14 +1819,13 @@ I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h)(0x68C0269C)
 I (../Core/Inc/i2c.h)(0x69F60281)
 I (../Core/Inc/spi.h)(0x69F60281)
 I (../Core/Inc/usart.h)(0x69F60282)
-I (../Core/Inc/ins_nav.h)(0x69E76161)
 I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h)(0x68C02609)
 I (C:\Keil_v5\ARM\ARMCC\include\string.h)(0x588B8344)
-F (..\Core\App\app_state.h)(0x69F6CBC0)()
-F (..\Core\Task\task_gyro.c)(0x69F6CC8F)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\task_gyro.o --omf_browse guitu_v1.0\task_gyro.crf --depend guitu_v1.0\task_gyro.d)
-I (..\Core\Task\task_gyro.h)(0x69F6CC8F)
+F (..\Core\App\app_state.h)(0x69F82527)()
+F (..\Core\Task\task_gyro.c)(0x69F83F7F)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\task_gyro.o --omf_browse guitu_v1.0\task_gyro.crf --depend guitu_v1.0\task_gyro.d)
+I (..\Core\Task\task_gyro.h)(0x69F83EB4)
 I (C:\Keil_v5\ARM\ARMCC\include\stdint.h)(0x588B8344)
-I (../Core/App/app_config.h)(0x69F6CBC0)
+I (../Core/App/app_config.h)(0x69F8388C)
 I (../Core/Inc/adc.h)(0x69E49919)
 I (../Core/Inc/main.h)(0x69F60283)
 I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h)(0x68C0269C)
@@ -1887,9 +1870,11 @@ I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h)(0x68C0269C)
 I (../Core/Inc/i2c.h)(0x69F60281)
 I (../Core/Inc/spi.h)(0x69F60281)
 I (../Core/Inc/usart.h)(0x69F60282)
-I (../Core/App/app_event.h)(0x69F6CBC0)
-I (../Core/App/app_msg.h)(0x69F6CBC0)
-I (../Core/App/app_rtos.h)(0x69F6CBC0)
+I (../Core/App/app_event.h)(0x69F6F17A)
+I (../Core/App/app_msg.h)(0x69F70118)
+I (../Core/App/app_rtos.h)(0x69F70118)
+I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h)(0x68C02609)
+I (../Core/App/app_state.h)(0x69F82527)
 I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h)(0x68C02609)
 I (../Core/Inc/FreeRTOSConfig.h)(0x69F6027F)
@@ -1900,15 +1885,14 @@ I (../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F/portmacro.h
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/task.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/list.h)(0x68C02609)
-I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h)(0x68C02609)
-I (../Core/App/app_state.h)(0x69F6CBC0)
-I (../Core/Inc/ins_nav.h)(0x69E76161)
 I (C:\Keil_v5\ARM\ARMCC\include\string.h)(0x588B8344)
-F (..\Core\Task\task_gyro.h)(0x69F6CC8F)()
-F (..\Core\Task\task_adc.c)(0x69F6CDF1)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\task_adc.o --omf_browse guitu_v1.0\task_adc.crf --depend guitu_v1.0\task_adc.d)
+F (..\Core\Task\task_gyro.h)(0x69F83EB4)()
+F (..\Core\Task\task_adc.c)(0x69F83614)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\task_adc.o --omf_browse guitu_v1.0\task_adc.crf --depend guitu_v1.0\task_adc.d)
 I (..\Core\Task\task_adc.h)(0x69F6CC8F)
 I (C:\Keil_v5\ARM\ARMCC\include\stdint.h)(0x588B8344)
-I (../Core/App/app_config.h)(0x69F6CBC0)
+I (..\Core\Task\task_debug.h)(0x69F6F389)
+I (../Core/App/app_msg.h)(0x69F70118)
+I (../Core/App/app_config.h)(0x69F8388C)
 I (../Core/Inc/adc.h)(0x69E49919)
 I (../Core/Inc/main.h)(0x69F60283)
 I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h)(0x68C0269C)
@@ -1953,9 +1937,10 @@ I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h)(0x68C0269C)
 I (../Core/Inc/i2c.h)(0x69F60281)
 I (../Core/Inc/spi.h)(0x69F60281)
 I (../Core/Inc/usart.h)(0x69F60282)
-I (../Core/App/app_event.h)(0x69F6CBC0)
-I (../Core/App/app_msg.h)(0x69F6CBC0)
-I (../Core/App/app_rtos.h)(0x69F6CBC0)
+I (../Core/App/app_event.h)(0x69F6F17A)
+I (../Core/App/app_rtos.h)(0x69F70118)
+I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h)(0x68C02609)
+I (../Core/App/app_state.h)(0x69F82527)
 I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h)(0x68C02609)
 I (../Core/Inc/FreeRTOSConfig.h)(0x69F6027F)
@@ -1966,17 +1951,14 @@ I (../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F/portmacro.h
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/task.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/list.h)(0x68C02609)
-I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h)(0x68C02609)
-I (../Core/App/app_state.h)(0x69F6CBC0)
-I (../Core/Inc/ins_nav.h)(0x69E76161)
 I (C:\Keil_v5\ARM\ARMCC\include\string.h)(0x588B8344)
 F (..\Core\Task\task_adc.h)(0x69F6CC8F)()
-F (..\Core\Task\task_control.c)(0x69F6CC8F)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\task_control.o --omf_browse guitu_v1.0\task_control.crf --depend guitu_v1.0\task_control.d)
+F (..\Core\Task\task_control.c)(0x69F8315B)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\task_control.o --omf_browse guitu_v1.0\task_control.crf --depend guitu_v1.0\task_control.d)
 I (..\Core\Task\task_control.h)(0x69F6CC8F)
-I (../Core/App/app_event.h)(0x69F6CBC0)
-I (../Core/App/app_msg.h)(0x69F6CBC0)
+I (../Core/App/app_event.h)(0x69F6F17A)
+I (../Core/App/app_msg.h)(0x69F70118)
 I (C:\Keil_v5\ARM\ARMCC\include\stdint.h)(0x588B8344)
-I (../Core/App/app_config.h)(0x69F6CBC0)
+I (../Core/App/app_config.h)(0x69F8388C)
 I (../Core/Inc/adc.h)(0x69E49919)
 I (../Core/Inc/main.h)(0x69F60283)
 I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h)(0x68C0269C)
@@ -2021,7 +2003,9 @@ I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h)(0x68C0269C)
 I (../Core/Inc/i2c.h)(0x69F60281)
 I (../Core/Inc/spi.h)(0x69F60281)
 I (../Core/Inc/usart.h)(0x69F60282)
-I (../Core/App/app_rtos.h)(0x69F6CBC0)
+I (../Core/App/app_rtos.h)(0x69F70118)
+I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h)(0x68C02609)
+I (../Core/App/app_state.h)(0x69F82527)
 I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h)(0x68C02609)
 I (../Core/Inc/FreeRTOSConfig.h)(0x69F6027F)
@@ -2032,16 +2016,13 @@ I (../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F/portmacro.h
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/task.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/list.h)(0x68C02609)
-I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h)(0x68C02609)
-I (../Core/App/app_state.h)(0x69F6CBC0)
-I (../Core/Inc/ins_nav.h)(0x69E76161)
-I (..\Core\Task\task_debug.h)(0x69F6CC8F)
+I (..\Core\Task\task_debug.h)(0x69F6F389)
 F (..\Core\Task\task_control.h)(0x69F6CC8F)()
-F (..\Core\Task\task_debug.c)(0x69F6CC8F)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\task_debug.o --omf_browse guitu_v1.0\task_debug.crf --depend guitu_v1.0\task_debug.d)
-I (..\Core\Task\task_debug.h)(0x69F6CC8F)
+F (..\Core\Task\task_debug.c)(0x69F8315B)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\task_debug.o --omf_browse guitu_v1.0\task_debug.crf --depend guitu_v1.0\task_debug.d)
+I (..\Core\Task\task_debug.h)(0x69F6F389)
 I (C:\Keil_v5\ARM\ARMCC\include\stdint.h)(0x588B8344)
-I (../Core/App/app_msg.h)(0x69F6CBC0)
-I (../Core/App/app_config.h)(0x69F6CBC0)
+I (../Core/App/app_msg.h)(0x69F70118)
+I (../Core/App/app_config.h)(0x69F8388C)
 I (../Core/Inc/adc.h)(0x69E49919)
 I (../Core/Inc/main.h)(0x69F60283)
 I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h)(0x68C0269C)
@@ -2086,8 +2067,9 @@ I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h)(0x68C0269C)
 I (../Core/Inc/i2c.h)(0x69F60281)
 I (../Core/Inc/spi.h)(0x69F60281)
 I (../Core/Inc/usart.h)(0x69F60282)
-I (../Core/App/app_event.h)(0x69F6CBC0)
-I (../Core/App/app_rtos.h)(0x69F6CBC0)
+I (../Core/App/app_event.h)(0x69F6F17A)
+I (../Core/App/app_rtos.h)(0x69F70118)
+I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h)(0x68C02609)
 I (../Core/Inc/FreeRTOSConfig.h)(0x69F6027F)
@@ -2098,15 +2080,14 @@ I (../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F/portmacro.h
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/task.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/list.h)(0x68C02609)
-I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h)(0x68C02609)
 I (C:\Keil_v5\ARM\ARMCC\include\stdarg.h)(0x588B8344)
 I (C:\Keil_v5\ARM\ARMCC\include\stdio.h)(0x588B8344)
 I (C:\Keil_v5\ARM\ARMCC\include\string.h)(0x588B8344)
-F (..\Core\Task\task_debug.h)(0x69F6CC8F)()
-F (..\Core\Task\task_lora.c)(0x69F6CD7F)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\task_lora.o --omf_browse guitu_v1.0\task_lora.crf --depend guitu_v1.0\task_lora.d)
+F (..\Core\Task\task_debug.h)(0x69F6F389)()
+F (..\Core\Task\task_lora.c)(0x69F8315B)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\task_lora.o --omf_browse guitu_v1.0\task_lora.crf --depend guitu_v1.0\task_lora.d)
 I (..\Core\Task\task_lora.h)(0x69F6CC8F)
 I (C:\Keil_v5\ARM\ARMCC\include\stdint.h)(0x588B8344)
-I (../Core/App/app_config.h)(0x69F6CBC0)
+I (../Core/App/app_config.h)(0x69F8388C)
 I (../Core/Inc/adc.h)(0x69E49919)
 I (../Core/Inc/main.h)(0x69F60283)
 I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h)(0x68C0269C)
@@ -2151,9 +2132,11 @@ I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h)(0x68C0269C)
 I (../Core/Inc/i2c.h)(0x69F60281)
 I (../Core/Inc/spi.h)(0x69F60281)
 I (../Core/Inc/usart.h)(0x69F60282)
-I (../Core/App/app_event.h)(0x69F6CBC0)
-I (../Core/App/app_msg.h)(0x69F6CBC0)
-I (../Core/App/app_rtos.h)(0x69F6CBC0)
+I (../Core/App/app_event.h)(0x69F6F17A)
+I (../Core/App/app_msg.h)(0x69F70118)
+I (../Core/App/app_rtos.h)(0x69F70118)
+I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h)(0x68C02609)
+I (../Core/App/app_state.h)(0x69F82527)
 I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h)(0x68C02609)
 I (../Core/Inc/FreeRTOSConfig.h)(0x69F6027F)
@@ -2164,15 +2147,12 @@ I (../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F/portmacro.h
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/task.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/list.h)(0x68C02609)
-I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h)(0x68C02609)
-I (../Core/App/app_state.h)(0x69F6CBC0)
-I (../Core/Inc/ins_nav.h)(0x69E76161)
-I (..\Core\Task\task_debug.h)(0x69F6CC8F)
+I (..\Core\Task\task_debug.h)(0x69F6F389)
 I (C:\Keil_v5\ARM\ARMCC\include\string.h)(0x588B8344)
 F (..\Core\Task\task_lora.h)(0x69F6CC8F)()
-F (..\Core\Task\task_return.c)(0x69F6CC90)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\task_return.o --omf_browse guitu_v1.0\task_return.crf --depend guitu_v1.0\task_return.d)
+F (..\Core\Task\task_return.c)(0x69F8315B)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\task_return.o --omf_browse guitu_v1.0\task_return.crf --depend guitu_v1.0\task_return.d)
 I (..\Core\Task\task_return.h)(0x69F6CC90)
-I (../Core/App/app_config.h)(0x69F6CBC0)
+I (../Core/App/app_config.h)(0x69F8388C)
 I (../Core/Inc/adc.h)(0x69E49919)
 I (../Core/Inc/main.h)(0x69F60283)
 I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h)(0x68C0269C)
@@ -2218,9 +2198,11 @@ I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h)(0x68C0269C)
 I (../Core/Inc/i2c.h)(0x69F60281)
 I (../Core/Inc/spi.h)(0x69F60281)
 I (../Core/Inc/usart.h)(0x69F60282)
-I (../Core/App/app_event.h)(0x69F6CBC0)
-I (../Core/App/app_msg.h)(0x69F6CBC0)
-I (../Core/App/app_rtos.h)(0x69F6CBC0)
+I (../Core/App/app_event.h)(0x69F6F17A)
+I (../Core/App/app_msg.h)(0x69F70118)
+I (../Core/App/app_rtos.h)(0x69F70118)
+I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h)(0x68C02609)
+I (../Core/App/app_state.h)(0x69F82527)
 I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h)(0x68C02609)
 I (../Core/Inc/FreeRTOSConfig.h)(0x69F6027F)
@@ -2231,16 +2213,13 @@ I (../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F/portmacro.h
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/task.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/list.h)(0x68C02609)
-I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h)(0x68C02609)
-I (../Core/App/app_state.h)(0x69F6CBC0)
-I (../Core/Inc/ins_nav.h)(0x69E76161)
-I (..\Core\Task\task_debug.h)(0x69F6CC8F)
+I (..\Core\Task\task_debug.h)(0x69F6F389)
 I (C:\Keil_v5\ARM\ARMCC\include\string.h)(0x588B8344)
 F (..\Core\Task\task_return.h)(0x69F6CC90)()
-F (..\Core\Task\task_spo2.c)(0x69F6CC8F)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\task_spo2.o --omf_browse guitu_v1.0\task_spo2.crf --depend guitu_v1.0\task_spo2.d)
+F (..\Core\Task\task_spo2.c)(0x69F8315B)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\task_spo2.o --omf_browse guitu_v1.0\task_spo2.crf --depend guitu_v1.0\task_spo2.d)
 I (..\Core\Task\task_spo2.h)(0x69F6CC8F)
 I (C:\Keil_v5\ARM\ARMCC\include\stdint.h)(0x588B8344)
-I (../Core/App/app_config.h)(0x69F6CBC0)
+I (../Core/App/app_config.h)(0x69F8388C)
 I (../Core/Inc/adc.h)(0x69E49919)
 I (../Core/Inc/main.h)(0x69F60283)
 I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h)(0x68C0269C)
@@ -2285,8 +2264,11 @@ I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h)(0x68C0269C)
 I (../Core/Inc/i2c.h)(0x69F60281)
 I (../Core/Inc/spi.h)(0x69F60281)
 I (../Core/Inc/usart.h)(0x69F60282)
-I (../Core/App/app_event.h)(0x69F6CBC0)
-I (../Core/App/app_rtos.h)(0x69F6CBC0)
+I (../Core/App/app_event.h)(0x69F6F17A)
+I (../Core/App/app_rtos.h)(0x69F70118)
+I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h)(0x68C02609)
+I (../Core/App/app_state.h)(0x69F82527)
+I (../Core/App/app_msg.h)(0x69F70118)
 I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h)(0x68C02609)
 I (../Core/Inc/FreeRTOSConfig.h)(0x69F6027F)
@@ -2297,16 +2279,12 @@ I (../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F/portmacro.h
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/task.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/list.h)(0x68C02609)
-I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h)(0x68C02609)
-I (../Core/App/app_state.h)(0x69F6CBC0)
-I (../Core/App/app_msg.h)(0x69F6CBC0)
-I (../Core/Inc/ins_nav.h)(0x69E76161)
 I (C:\Keil_v5\ARM\ARMCC\include\string.h)(0x588B8344)
 F (..\Core\Task\task_spo2.h)(0x69F6CC8F)()
-F (..\Core\Task\task_ui.c)(0x69F6CC8F)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\task_ui.o --omf_browse guitu_v1.0\task_ui.crf --depend guitu_v1.0\task_ui.d)
+F (..\Core\Task\task_ui.c)(0x69F8315B)(--c99 --gnu -c --cpu Cortex-M7.fp.dp -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc -I ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32H7xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F -I ../Core/App -I ..\Core\Task-I.\RTE\_GUITU_v1.0-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.9.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32H7xx\Include-D__UVISION_VERSION="539" -D_RTE_ -DSTM32H743xx -D_RTE_ -DUSE_PWR_LDO_SUPPLY -DUSE_HAL_DRIVER -DSTM32H743xx-o guitu_v1.0\task_ui.o --omf_browse guitu_v1.0\task_ui.crf --depend guitu_v1.0\task_ui.d)
 I (..\Core\Task\task_ui.h)(0x69F6CC8F)
 I (C:\Keil_v5\ARM\ARMCC\include\stdint.h)(0x588B8344)
-I (../Core/App/app_config.h)(0x69F6CBC0)
+I (../Core/App/app_config.h)(0x69F8388C)
 I (../Core/Inc/adc.h)(0x69E49919)
 I (../Core/Inc/main.h)(0x69F60283)
 I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h)(0x68C0269C)
@@ -2351,9 +2329,11 @@ I (../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h)(0x68C0269C)
 I (../Core/Inc/i2c.h)(0x69F60281)
 I (../Core/Inc/spi.h)(0x69F60281)
 I (../Core/Inc/usart.h)(0x69F60282)
-I (../Core/App/app_event.h)(0x69F6CBC0)
-I (../Core/App/app_msg.h)(0x69F6CBC0)
-I (../Core/App/app_rtos.h)(0x69F6CBC0)
+I (../Core/App/app_event.h)(0x69F6F17A)
+I (../Core/App/app_msg.h)(0x69F70118)
+I (../Core/App/app_rtos.h)(0x69F70118)
+I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h)(0x68C02609)
+I (../Core/App/app_state.h)(0x69F82527)
 I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h)(0x68C02609)
 I (../Core/Inc/FreeRTOSConfig.h)(0x69F6027F)
@@ -2364,8 +2344,5 @@ I (../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F/portmacro.h
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/task.h)(0x68C02609)
 I (../Middlewares/Third_Party/FreeRTOS/Source/include/list.h)(0x68C02609)
-I (../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h)(0x68C02609)
-I (../Core/App/app_state.h)(0x69F6CBC0)
-I (../Core/Inc/ins_nav.h)(0x69E76161)
 I (C:\Keil_v5\ARM\ARMCC\include\string.h)(0x588B8344)
 F (..\Core\Task\task_ui.h)(0x69F6CC8F)()

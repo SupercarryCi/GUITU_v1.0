@@ -6,27 +6,48 @@
 #include "app_rtos.h"
 #include "app_state.h"
 #include "cmsis_os.h"
-#include "ins_nav.h"
 
 #include <string.h>
 
-static uint8_t s_gyroRxDmaBuffer[APP_GYRO_DMA_BUFFER_SIZE];
+/*
+ * 陀螺仪链路：
+ * USART1 ReceiveToIdle DMA -> HAL 回调复制原始帧 -> g_gyroRxQueue ->
+ * GyroTask 解码 -> GyroState。
+ */
+static uint8_t s_gyroRxDmaBuffer[APP_GYRO_DMA_BUFFER_SIZE] __attribute__((section(".dma_buffer"), aligned(32)));//我将稳稳地接住你
 static volatile uint32_t s_gyroDropFromIsr = 0U;
 static volatile uint32_t s_gyroRestartError = 0U;
 
+/* 待你完善：按实际陀螺仪串口协议拆帧、校验，并填充 GyroFrame_t。 */
+/* 待你完善：每次上电后在这里配置陀螺仪输出内容、量程、频率等寄存器。 */
+__weak int32_t App_GyroHardwareInit(void)
+{
+    return 0;
+}
+
 __weak int32_t App_GyroDecodeFrame(const uint8_t *data,
                                    uint16_t len,
-                                   INS_SensorFrame *frame)
+                                   GyroFrame_t *frame)
 {
+    /*
+     * 业务接入点：
+     * 在新文件中实现同名强符号函数，把串口协议帧转换为 GyroFrame_t。
+     * 返回 0 表示解析成功；返回非 0 表示本帧丢弃。
+     */
     (void)data;
     (void)len;
     (void)frame;
     return -1;
 }
 
-static uint32_t task_gyro_tick(void)
+int32_t Task_GyroInitHardware(void)
 {
-    return osKernelGetTickCount();
+    if (App_GyroHardwareInit() != 0)
+    {
+        return -1;
+    }
+
+    return Task_GyroStartRx();
 }
 
 int32_t Task_GyroStartRx(void)
@@ -53,26 +74,21 @@ void Task_GyroEntry(void *argument)
 {
     GyroRxMsg_t msg;
     GyroState_t gyro;
-    NavState_t nav;
-    INS_Context ins_ctx;
-    INS_Config ins_config;
 
     (void)argument;
 
     memset(&gyro, 0, sizeof(gyro));
-    memset(&nav, 0, sizeof(nav));
-    INS_DefaultConfig(&ins_config);
-    INS_Init(&ins_ctx, &ins_config);
 
-    osEventFlagsWait(g_sysEventFlags, SYS_EVT_INIT_DONE, osFlagsWaitAny, osWaitForever);
+    osEventFlagsWait(g_sysEventFlags,
+                     SYS_EVT_INIT_DONE,
+                     osFlagsWaitAny | osFlagsNoClear,
+                     osWaitForever);
 
     for (;;)
     {
         if (osMessageQueueGet(g_gyroRxQueue, &msg, NULL, osWaitForever) == osOK)
         {
-            INS_SensorFrame frame;
-            INS_State ins_state;
-            INS_Status ins_status = INS_STATUS_INVALID_ARGUMENT;
+            GyroFrame_t frame;
             int32_t decode_result;
             uint16_t copy_len = msg.len;
 
@@ -84,33 +100,20 @@ void Task_GyroEntry(void *argument)
             gyro.rx_count++;
             gyro.drop_count = s_gyroDropFromIsr + s_gyroRestartError;
             gyro.raw_len = copy_len;
-            gyro.last_tick_ms = msg.tick_ms;
             memcpy(gyro.raw, msg.data, copy_len);
 
             memset(&frame, 0, sizeof(frame));
+            /* 待你完善：App_GyroDecodeFrame 输出的单位必须匹配 GyroFrame_t 定义。 */
+            /* 协议解析在任务上下文执行，避免在中断里做重活。 */
             decode_result = App_GyroDecodeFrame(msg.data, msg.len, &frame);
+            gyro.last_parse_result = decode_result;
             if (decode_result == 0)
             {
                 gyro.frame = frame;
-                gyro.frame_valid = 1U;
-                ins_status = INS_UpdateSensorFrame(&ins_ctx, &frame, 0U, &ins_state);
-                gyro.last_ins_status = ins_status;
-
-                if (ins_status == INS_STATUS_OK)
-                {
-                    nav.valid = 1U;
-                    nav.update_count++;
-                    nav.last_tick_ms = task_gyro_tick();
-                    nav.state = ins_state;
-                    App_StateSetNav(&nav);
-                    osEventFlagsSet(g_sysEventFlags, SYS_EVT_NAV_UPDATED);
-                }
             }
             else
             {
-                gyro.frame_valid = 0U;
                 gyro.parse_error_count++;
-                gyro.last_ins_status = INS_STATUS_INVALID_ARGUMENT;
             }
 
             App_StateSetGyro(&gyro);
@@ -133,10 +136,10 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 
         if ((copy_len > 0U) && (g_gyroRxQueue != NULL))
         {
+            /* ISR 只复制定长小缓冲并投队列，不做协议解析。 */
             memset(&msg, 0, sizeof(msg));
             memcpy(msg.data, s_gyroRxDmaBuffer, copy_len);
             msg.len = Size;
-            msg.tick_ms = osKernelGetTickCount();
 
             if (osMessageQueuePut(g_gyroRxQueue, &msg, 0U, 0U) != osOK)
             {

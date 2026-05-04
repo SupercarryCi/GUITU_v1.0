@@ -7,6 +7,7 @@ extern "C" {
 
 #include <stdint.h>
 
+int32_t Task_GyroInitHardware(void);
 int32_t Task_GyroStartRx(void);
 void Task_GyroEntry(void *argument);
 

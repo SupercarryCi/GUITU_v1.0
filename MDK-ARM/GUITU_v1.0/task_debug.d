@@ -50,6 +50,7 @@ guitu_v1.0\task_debug.o: ../Core/Inc/spi.h
 guitu_v1.0\task_debug.o: ../Core/Inc/usart.h
 guitu_v1.0\task_debug.o: ../Core/App/app_event.h
 guitu_v1.0\task_debug.o: ../Core/App/app_rtos.h
+guitu_v1.0\task_debug.o: ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h
 guitu_v1.0\task_debug.o: ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h
 guitu_v1.0\task_debug.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h
 guitu_v1.0\task_debug.o: ../Core/Inc/FreeRTOSConfig.h
@@ -60,7 +61,6 @@ guitu_v1.0\task_debug.o: ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVD
 guitu_v1.0\task_debug.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h
 guitu_v1.0\task_debug.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/task.h
 guitu_v1.0\task_debug.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/list.h
-guitu_v1.0\task_debug.o: ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h
 guitu_v1.0\task_debug.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdarg.h
 guitu_v1.0\task_debug.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
 guitu_v1.0\task_debug.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h

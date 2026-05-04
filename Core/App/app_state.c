@@ -3,6 +3,10 @@
 
 #include <string.h>
 
+/*
+ * 每类业务数据保留一份“最新状态”。
+ * UI/返航等低频任务读取快照，避免直接依赖其他任务的内部变量。
+ */
 static AppSystemState_t g_systemState;
 static GyroState_t g_gyroState;
 static NavState_t g_navState;
@@ -13,17 +17,9 @@ static LoraState_t g_loraState;
 static ReturnState_t g_returnState;
 static osMutexId_t g_stateMutex = NULL;
 
-static uint32_t app_state_tick(void)
-{
-    if (osKernelGetState() == osKernelInactive)
-    {
-        return 0U;
-    }
-    return osKernelGetTickCount();
-}
-
 int32_t App_StateInit(void)
 {
+    /* 状态必须在任务启动前清零，防止 UI 显示到未初始化数据。 */
     memset(&g_systemState, 0, sizeof(g_systemState));
     memset(&g_gyroState, 0, sizeof(g_gyroState));
     memset(&g_navState, 0, sizeof(g_navState));
@@ -33,7 +29,6 @@ int32_t App_StateInit(void)
     memset(&g_loraState, 0, sizeof(g_loraState));
     memset(&g_returnState, 0, sizeof(g_returnState));
 
-    g_loraState.enabled = APP_LORA_ENABLE_DEFAULT;
     g_returnState.mode = RETURN_MODE_IDLE;
 
     g_stateMutex = osMutexNew(NULL);
@@ -80,7 +75,6 @@ void App_StateSetInitResult(uint32_t done_mask, int32_t result)
     osMutexAcquire(g_stateMutex, osWaitForever);
     g_systemState.init_done_mask = done_mask;
     g_systemState.init_result = result;
-    g_systemState.last_tick_ms = app_state_tick();
     osMutexRelease(g_stateMutex);
 }
 
@@ -94,7 +88,6 @@ void App_StateAddFault(uint32_t fault_code)
     osMutexAcquire(g_stateMutex, osWaitForever);
     g_systemState.fault_count++;
     g_systemState.last_fault_code = fault_code;
-    g_systemState.last_tick_ms = app_state_tick();
     osMutexRelease(g_stateMutex);
 }
 
@@ -273,6 +266,7 @@ void App_StateGetSnapshot(AppSnapshot_t *snapshot)
         return;
     }
 
+    /* 单次锁住复制整机快照，保证 UI/返航看到的数据来自同一时刻。 */
     osMutexAcquire(g_stateMutex, osWaitForever);
     snapshot->system = g_systemState;
     snapshot->gyro = g_gyroState;

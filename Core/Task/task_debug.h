@@ -11,7 +11,7 @@ extern "C" {
 
 int32_t Task_DebugInitHardware(void);
 void Task_DebugEntry(void *argument);
-void App_DebugLog(AppLogLevel_t level, const char *fmt, ...);
+void App_DebugLog(const char *fmt, ...);
 
 #ifdef __cplusplus
 }

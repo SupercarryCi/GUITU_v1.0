@@ -9,32 +9,21 @@
 #include <stdio.h>
 #include <string.h>
 
-static const char *task_debug_level_text(AppLogLevel_t level)
-{
-    switch (level)
-    {
-        case APP_LOG_DEBUG:
-            return "D";
-        case APP_LOG_INFO:
-            return "I";
-        case APP_LOG_WARN:
-            return "W";
-        case APP_LOG_ERROR:
-            return "E";
-        default:
-            return "?";
-    }
-}
-
+/*
+ * Debug 日志链路：
+ * 任意任务调用 App_DebugLog() -> g_debugLogQueue ->
+ * DebugTask 串口输出，避免多个任务直接抢 UART。
+ */
 int32_t Task_DebugInitHardware(void)
 {
+    /* 待你完善：如需 debug 串口 DMA、日志等级过滤或环形缓冲，在这里补充。 */
     return 0;
 }
 
-void App_DebugLog(AppLogLevel_t level, const char *fmt, ...)
+void App_DebugLog(const char *fmt, ...)
 {
-    DebugLogMsg_t msg;
-    va_list args;
+    DebugLogMsg_t msg;//目前仅留32字节
+    va_list args;//至臻
 
     if ((fmt == NULL) || (g_debugLogQueue == NULL))
     {
@@ -42,16 +31,12 @@ void App_DebugLog(AppLogLevel_t level, const char *fmt, ...)
     }
 
     memset(&msg, 0, sizeof(msg));
-    msg.level = level;
-    if (osKernelGetState() != osKernelInactive)
-    {
-        msg.tick_ms = osKernelGetTickCount();
-    }
 
     va_start(args, fmt);
     (void)vsnprintf(msg.text, sizeof(msg.text), fmt, args);
     va_end(args);
 
+    /* 日志队列满时丢弃本条，避免低优先级 debug 反向阻塞实时任务。 */
     (void)osMessageQueuePut(g_debugLogQueue, &msg, 0U, 0U);
 }
 
@@ -62,7 +47,10 @@ void Task_DebugEntry(void *argument)
 
     (void)argument;
 
-    osEventFlagsWait(g_sysEventFlags, SYS_EVT_INIT_DONE, osFlagsWaitAny, osWaitForever);
+    osEventFlagsWait(g_sysEventFlags,
+                     SYS_EVT_INIT_DONE,
+                     osFlagsWaitAny | osFlagsNoClear,
+                     osWaitForever);
 
     for (;;)
     {
@@ -72,9 +60,7 @@ void Task_DebugEntry(void *argument)
 
             len = snprintf(line,
                            sizeof(line),
-                           "[%lu][%s] %s\r\n",
-                           (unsigned long)msg.tick_ms,
-                           task_debug_level_text(msg.level),
+                           "%s\r\n",
                            msg.text);
             if (len <= 0)
             {

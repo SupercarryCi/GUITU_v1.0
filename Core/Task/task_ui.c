@@ -10,6 +10,12 @@
 
 #include <string.h>
 
+/*
+ * UI 链路：
+ * 周期读取 AppSnapshot_t 刷屏，同时轮询触摸。
+ * 触摸产生 AppCommandMsg_t，由 ControlTask 统一分发。
+ */
+/* 待你完善：初始化屏幕控制器、背光、触摸控制器等真实 UI 硬件。 */
 __weak int32_t App_UiHardwareInit(void)
 {
     HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_SET);
@@ -18,13 +24,17 @@ __weak int32_t App_UiHardwareInit(void)
     return 0;
 }
 
+/* 待你完善：根据 snapshot 绘制导航、血氧、ADC、LoRa、返航状态等界面。 */
 __weak void App_UiRender(const AppSnapshot_t *snapshot)
 {
+    /* 业务接入点：在这里使用 snapshot 更新屏幕显示内容。 */
     (void)snapshot;
 }
 
+/* 待你完善：扫描触摸屏，把用户操作转换为 AppCommandMsg_t。 */
 __weak int32_t App_UiPollTouch(AppCommandMsg_t *command)
 {
+    /* 业务接入点：检测到有效触摸命令时填充 command 并返回 >0。 */
     (void)command;
     return 0;
 }
@@ -43,7 +53,10 @@ void Task_UiEntry(void *argument)
     (void)argument;
     memset(&ui, 0, sizeof(ui));
 
-    osEventFlagsWait(g_sysEventFlags, SYS_EVT_INIT_DONE, osFlagsWaitAny, osWaitForever);
+    osEventFlagsWait(g_sysEventFlags,
+                     SYS_EVT_INIT_DONE,
+                     osFlagsWaitAny | osFlagsNoClear,
+                     osWaitForever);
     next_tick = osKernelGetTickCount();
 
     for (;;)
@@ -53,6 +66,7 @@ void Task_UiEntry(void *argument)
         memset(&snapshot, 0, sizeof(snapshot));
         App_StateGetSnapshot(&snapshot);
 
+        /* 显示 SPI 和触摸 SPI 分开加锁，避免两个设备操作互相打断。 */
         if (osMutexAcquire(g_spiDisplayMutex, osWaitForever) == osOK)
         {
             App_UiRender(&snapshot);
@@ -65,13 +79,11 @@ void Task_UiEntry(void *argument)
         {
             if (App_UiPollTouch(&command) > 0)
             {
-                command.tick_ms = osKernelGetTickCount();
                 if (osMessageQueuePut(g_uiCmdQueue, &command, 0U, 0U) == osOK)
                 {
                     ui.last_command = command;
                     ui.command_count++;
                     ui.touch_count++;
-                    ui.last_tick_ms = command.tick_ms;
                     osEventFlagsSet(g_sysEventFlags, SYS_EVT_UI_COMMAND);
                 }
             }

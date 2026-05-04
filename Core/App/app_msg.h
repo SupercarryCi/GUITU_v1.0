@@ -15,52 +15,42 @@ typedef enum
     APP_CMD_MARK_PATH_POINT,
     APP_CMD_LORA_SEND,
     APP_CMD_USER_BASE = 100
-} AppCommandId_t;
-
-typedef enum
-{
-    APP_LOG_DEBUG = 0,
-    APP_LOG_INFO,
-    APP_LOG_WARN,
-    APP_LOG_ERROR
-} AppLogLevel_t;
+} AppCommandId_t;//需要大改，先放着
 
 typedef struct
 {
+    /* 一帧原始陀螺仪数据 */
     uint8_t data[APP_GYRO_RX_MAX_LEN];
     uint16_t len;
-    uint32_t tick_ms;
 } GyroRxMsg_t;
 
 typedef struct
 {
+    /* UI 触摸输出的统一命令，ControlTask 负责分发给具体任务 */
     AppCommandId_t id;
     uint32_t param0;
     uint32_t param1;
-    uint32_t tick_ms;
 } AppCommandMsg_t;
 
 typedef struct
 {
+    /* LoRa 预留数据包结构，后续启用射频驱动后直接复用 */
     uint8_t port;
     uint8_t rssi_valid;
     int16_t rssi_dbm;
     uint16_t len;
-    uint32_t tick_ms;
     uint8_t payload[APP_LORA_MAX_PAYLOAD_LEN];
 } LoraPacketMsg_t;
 
 typedef struct
 {
+    /*返航命令，归途特色*/
     AppCommandId_t id;
-    uint32_t tick_ms;
 } ReturnCommandMsg_t;
 
 typedef struct
 {
-    AppLogLevel_t level;
-    uint32_t tick_ms;
-    char text[APP_DEBUG_LOG_TEXT_LEN];
+    char text[APP_DEBUG_LOG_TEXT_LEN];//经典串口帝巴戈
 } DebugLogMsg_t;
 
 #endif
