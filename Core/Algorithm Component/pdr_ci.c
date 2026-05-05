@@ -1,4 +1,10 @@
-#include "pdr_step_detector.h"
+/*
+ * ============================================================
+ * 通过PDR.py脚本使用GPT转化为.c.h
+ * ============================================================
+ */
+
+#include "pdr_ci.h"
 #include <math.h>
 #include <string.h>
 
@@ -7,6 +13,12 @@
  * 参数区：200 Hz 数据版本
  * ============================================================
  */
+
+/*
+ * 不同运动状态步长数据
+ */
+#define WALK_STEP_LENGTH                0.7f     /*待定*/
+#define RUN_STEP_LENGTH                 0.7f
 
 /*
  * IMU 实际采样率：200 Hz
@@ -111,6 +123,19 @@ static inline float pdr_absf(float x)
 static inline float pdr_maxf(float a, float b)
 {
     return (a > b) ? a : b;
+}
+
+static float pdr_step_length_from_mode(PdrMotionMode mode)
+{
+    if (mode == PDR_MODE_RUN) {
+        return RUN_STEP_LENGTH;
+    }
+
+    /*
+     * 检测到步但 WALK/RUN 还没稳定分类时，先按行走步长输出。
+     * 这样前几步不会因为 mode 暂时是 IDLE 而丢掉距离。
+     */
+    return WALK_STEP_LENGTH;
 }
 
 static inline uint32_t pdr_ms_to_samples(float ms)
@@ -264,6 +289,7 @@ void pdr_step_init(PdrStepDetector* det)
     pdr_lpf_init(&det->acc_gravity_lpf, PDR_ACC_GRAVITY_LPF_ALPHA);
 
     det->mode = PDR_MODE_IDLE;
+    det->total_distance_m = 0.0f;
     det->last_sign = 0;
     det->has_last_step = 0;
     det->has_last_raw = 0;
@@ -315,6 +341,7 @@ PdrStepOutput pdr_step_update(
             out.step_detected = 0;
             out.step_count = det->step_count;
             out.mode = det->mode;
+            out.total_distance_m = det->total_distance_m;
             return out;
         }
     }
@@ -438,6 +465,7 @@ PdrStepOutput pdr_step_update(
             out.step_detected = 0;
             out.step_count = det->step_count;
             out.mode = det->mode;
+            out.total_distance_m = det->total_distance_m;
             out.gyro_filtered = gyro_f;
             out.acc_energy = det->acc_energy_ema;
             out.lobe_peak = det->lobe_peak;
@@ -482,6 +510,7 @@ PdrStepOutput pdr_step_update(
             out.step_detected = 0;
             out.step_count = det->step_count;
             out.mode = det->mode;
+            out.total_distance_m = det->total_distance_m;
             out.gyro_filtered = gyro_f;
             out.acc_energy = det->acc_energy_ema;
             out.lobe_peak = det->lobe_peak;
@@ -542,6 +571,13 @@ PdrStepOutput pdr_step_update(
              */
             pdr_update_mode(det);
 
+            {
+                float step_length = pdr_step_length_from_mode(det->mode);
+                det->total_distance_m += step_length;
+                out.step_length_m = step_length;
+                out.delta_distance_m = step_length;
+            }
+
             det->last_step_index = det->sample_index;
             det->has_last_step = 1;
 
@@ -562,6 +598,7 @@ PdrStepOutput pdr_step_update(
      */
     out.step_count = det->step_count;
     out.mode = det->mode;
+    out.total_distance_m = det->total_distance_m;
     out.gyro_filtered = gyro_f;
     out.acc_energy = det->acc_energy_ema;
     out.lobe_peak = det->lobe_peak;

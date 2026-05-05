@@ -26,16 +26,19 @@ typedef struct
 
 typedef struct
 {
-    WitImuVector3 acc_raw;       /* WIT 0x51 原始加速度：raw / 32768 * 16g */
-    WitImuVector3 gyro_raw;      /* WIT 0x52 原始角速度：raw / 32768 * 2000 deg/s */
-    WitImuVector3 angle_raw;     /* WIT 0x53 原始角度：raw / 32768 * 180 deg */
-    WitImuQuat quat_raw;         /* WIT 0x59 原始四元数：raw / 32768 */
-    int16_t temp_raw;            /* WIT 原始温度：raw / 100 degC */
-    float accel_mps2[3];
-    float gyro_rad_s[3];
-    float angle_deg[3];
-    float quat[4];
-    float temp_deg_c;
+    /* --- 原始量（WIT陀螺仪的modbus协议 int16_t）--- */
+    WitImuVector3 acc_raw;       /* WIT 0x51 原始加速度：raw / 32768 * 16g    [x,y,z] */
+    WitImuVector3 gyro_raw;      /* WIT 0x52 原始角速度：raw / 32768 * 2000°/s [x,y,z] */
+    WitImuVector3 angle_raw;     /* WIT 0x53 原始角度：raw / 32768 * 180°      [x,y,z] */
+    WitImuQuat    quat_raw;      /* WIT 0x59 原始四元数：raw / 32768           [q0,q1,q2,q3] */
+    int16_t       temp_raw;      /* WIT 原始温度：raw / 100 °C */
+
+    /* --- 转换后的物理量（float）--- */
+    float accel_mps2[3];         /* [0]=X轴, [1]=Y轴, [2]=Z轴  加速度 单位 m/s² */
+    float gyro_rad_s[3];         /* [0]=Roll率, [1]=Pitch率, [2]=Yaw率  角速度 单位 rad/s */
+    float angle_deg[3];          /* [0]=Roll横滚, [1]=Pitch俯仰, [2]=Yaw航向  单位 ° */
+    float quat[4];               /* [0]=q0/w(实部), [1]=q1/x, [2]=q2/y, [3]=q3/z */
+    float temp_deg_c;            /* 温度 单位 °C */
 } GyroFrame_t;
 
 typedef struct
@@ -54,6 +57,7 @@ typedef struct
     float position_m[3];
     float velocity_mps[3];
     float attitude_rad[3];
+    float YAW_deg;
 } NavData_t;
 
 typedef struct

@@ -13,6 +13,7 @@
 #include "task_return.h"
 #include "task_spo2.h"
 #include "task_ui.h"
+#include "task_ins_pdr.h"
 
 /*
  * RTOS 对象在这里集中创建：
@@ -41,6 +42,7 @@ static osThreadId_t g_spo2TaskHandle = NULL;
 static osThreadId_t g_adcTaskHandle = NULL;
 static osThreadId_t g_debugTaskHandle = NULL;
 static osThreadId_t g_returnTaskHandle = NULL;
+static osThreadId_t g_ins_pdr_TaskHandle = NULL;
 
 static void InitTask(void *argument);
 static int32_t App_InitPeripherals(uint32_t *done_mask);
@@ -234,6 +236,11 @@ static int32_t App_StartRuntimeTasks(void)
         .priority = osPriorityAboveNormal,
         .stack_size = 1536U
     };
+    const osThreadAttr_t ins_pdr_TaskAttr = {
+        .name = "ins_pdr_Task",
+        .priority = osPriorityAboveNormal,
+        .stack_size = 2048U
+    };
 
     g_gyroTaskHandle = osThreadNew(Task_GyroEntry, NULL, &gyroTaskAttr);
     g_uiTaskHandle = osThreadNew(Task_UiEntry, NULL, &uiTaskAttr);
@@ -243,7 +250,7 @@ static int32_t App_StartRuntimeTasks(void)
     g_adcTaskHandle = osThreadNew(Task_AdcEntry, NULL, &adcTaskAttr);
     g_debugTaskHandle = osThreadNew(Task_DebugEntry, NULL, &debugTaskAttr);
     g_returnTaskHandle = osThreadNew(Task_ReturnEntry, NULL, &returnTaskAttr);
-
+    g_ins_pdr_TaskHandle = osThreadNew(Task_Ins_Pdr_Entry, NULL, &ins_pdr_TaskAttr);
     if ((g_gyroTaskHandle == NULL) ||
         (g_uiTaskHandle == NULL) ||
         (g_controlTaskHandle == NULL) ||
@@ -251,7 +258,8 @@ static int32_t App_StartRuntimeTasks(void)
         (g_spo2TaskHandle == NULL) ||
         (g_adcTaskHandle == NULL) ||
         (g_debugTaskHandle == NULL) ||
-        (g_returnTaskHandle == NULL))
+        (g_returnTaskHandle == NULL)||
+        (g_ins_pdr_TaskHandle == NULL))
     {
         return -1;
     }

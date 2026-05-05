@@ -25,6 +25,15 @@ typedef struct {
     PdrMotionMode mode;         // 当前状态：IDLE / WALK / RUN
 
     /*
+     * PDR 位移输出。
+     * delta_distance_m 只在本次确认一步时输出非零值；
+     * total_distance_m 为本模块内部累计的前向里程。
+     */
+    float step_length_m;
+    float delta_distance_m;
+    float total_distance_m;
+
+    /*
      * 调试量，可通过串口打印。
      * 部署时如果不用，可以删掉这些字段以节省 RAM。
      */
@@ -82,6 +91,7 @@ typedef struct {
     uint32_t step_count;
     uint16_t candidate_count;
     PdrMotionMode mode;
+    float total_distance_m;     // PDR 累计前向里程
 
     /*
      * 去重用。嵌入式里更推荐用 IMU data-ready 中断；
