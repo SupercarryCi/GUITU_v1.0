@@ -1,13 +1,30 @@
+# ======================== Keil MDK ========================
+# Listing 文件
+*.lst
+*.map
+*.lnp
+*.scr
+*.d
 *.o
 *.obj
 *.elf
 *.bin
-*.map
-*.axf
-*.d
 *.hex
 *.dbg
+*.crf
+*._i
 *.uvgui.*
 *.uvguix.*
-*.crf
-*.lnp
+*.axf
+*.htm
+*.dep
+*.iex
+*.i
+*.__i
+
+# Objects 文件夹
+Objects/
+RTE/
+EventRecorderStub.scvd
+# JLink 日志
+JLinkLog.txt

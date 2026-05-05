@@ -1445,6 +1445,16 @@
               <FileType>5</FileType>
               <FilePath>..\Core\Task\task_ui.h</FilePath>
             </File>
+            <File>
+              <FileName>task_ins_pdr.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Task\task_ins_pdr.c</FilePath>
+            </File>
+            <File>
+              <FileName>task_ins_pdr.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Core\Task\task_ins_pdr.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -1459,6 +1469,31 @@
               <FileName>wit_imu.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\Core\PeripheralDriver\wit_imu.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>A_Com</GroupName>
+          <Files>
+            <File>
+              <FileName>pedestrian_frame_transform.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Algorithm Component\pedestrian_frame_transform.c</FilePath>
+            </File>
+            <File>
+              <FileName>pedestrian_frame_transform.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Core\Algorithm Component\pedestrian_frame_transform.h</FilePath>
+            </File>
+            <File>
+              <FileName>pedestrian_inertial_nav.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Algorithm Component\pedestrian_inertial_nav.c</FilePath>
+            </File>
+            <File>
+              <FileName>pedestrian_inertial_nav.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Core\Algorithm Component\pedestrian_inertial_nav.h</FilePath>
             </File>
           </Files>
         </Group>

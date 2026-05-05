@@ -167,7 +167,7 @@ void Task_GyroEntry(void *argument)
             }
             App_StateSetGyro(&gyro);
             osEventFlagsSet(g_sysEventFlags, SYS_EVT_GYRO_UPDATED);
-            
+            //1
         }
     }
 }

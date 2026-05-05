@@ -56,14 +56,12 @@ typedef struct
     float attitude_rad[3];
 } NavData_t;
 
-/* ---------- INS 导航解算状态 ---------- */
 typedef struct
 {
     uint32_t update_count;         /* 累计解算更新次数 */
     NavData_t data;                /* 导航状态占位，具体算法由业务层完善 */
 } NavState_t;
 
-/* ---------- ADC 采样状态 ---------- */
 typedef struct
 {
     uint16_t raw[APP_ADC_CHANNEL_COUNT];        /* 各通道原始采样值 */
@@ -72,7 +70,6 @@ typedef struct
     uint32_t error_count;                       /* 采样错误次数 */
 } AdcState_t;
 
-/* ---------- 血氧传感器状态 ---------- */
 typedef struct
 {
     uint8_t  spo2_percent;         /* 血氧饱和度 (%) */
@@ -82,7 +79,6 @@ typedef struct
     uint32_t error_count;          /* 读取错误次数 */
 } Spo2State_t;
 
-/* ---------- UI 交互状态 ---------- */
 typedef struct
 {
     AppCommandMsg_t last_command;  /* 最近一次收到的 UI 命令 */
@@ -91,7 +87,6 @@ typedef struct
     uint32_t touch_count;          /* 累计触摸事件次数 */
 } UiState_t;
 
-/* ---------- LoRa 通信状态 ---------- */
 typedef struct
 {
     uint32_t tx_count;             /* 累计发送包数 */
@@ -100,7 +95,6 @@ typedef struct
     LoraPacketMsg_t last_rx;       /* 最近一次接收到的数据包 */
 } LoraState_t;
 
-/* ---------- 返航模式 ---------- */
 typedef enum
 {
     RETURN_MODE_IDLE = 0,          /* 空闲：未启动返航 */
@@ -110,7 +104,6 @@ typedef enum
     RETURN_MODE_FAULT              /* 故障：返航过程中出错 */
 } ReturnMode_t;
 
-/* ---------- 返航运行状态 ---------- */
 typedef struct
 {
     ReturnMode_t mode;             /* 当前返航模式 */
@@ -120,7 +113,6 @@ typedef struct
     uint32_t error_count;          /* 返航过程错误次数 */
 } ReturnState_t;
 
-/* ---------- 全局状态快照 ---------- */
 typedef struct
 {
     AppSystemState_t system;       /* 系统状态 */
@@ -131,7 +123,7 @@ typedef struct
     UiState_t        ui;           /* UI 状态 */
     LoraState_t      lora;         /* LoRa 状态 */
     ReturnState_t    return_home;  /* 返航状态 */
-} AppSnapshot_t;
+} AppSnapshot_t;//系统快照
 
 /* ---------- 状态管理接口 ---------- */
 
