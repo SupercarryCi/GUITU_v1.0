@@ -190,6 +190,13 @@ static int32_t App_InitPeripherals(uint32_t *done_mask)
     }
     mask |= APP_INIT_DEBUG;
 
+    if (Task_UWBInitHardware() != 0)
+    {
+        *done_mask = mask;
+        return -8;
+    }
+    mask |= APP_INIT_UWB;
+
     *done_mask = mask;
     return 0;
 }

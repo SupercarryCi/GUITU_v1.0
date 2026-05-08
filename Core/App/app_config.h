@@ -11,8 +11,8 @@ extern "C" {
 #include "usart.h"
 
 #define APP_GYRO_UART_HANDLE        huart2      /* 陀螺仪数据接收串口 (USART2) */
-#define APP_DEBUG_UART_HANDLE       huart3      /* 调试日志输出串口 (USART2) */
-#define APP_UWB_UART_HANDLE         huart1      /* UWB标签卡配置串口 (USART3) ,但是没使用*/
+#define APP_DEBUG_UART_HANDLE       huart3      /* 调试日志输出串口 (USART3) */
+#define APP_UWB_UART_HANDLE         huart1      /* UWB标签卡配置串口 (USART1) */
 
 #define APP_DISPLAY_SPI_HANDLE      hspi1       /* 显示屏 SPI 接口 */
 #define APP_TOUCH_SPI_HANDLE        hspi2       /* 触摸面板 SPI 接口 */
@@ -55,6 +55,7 @@ extern "C" {
 #define APP_INIT_SPO2               (1UL << 3)  /* 血氧传感器初始化完成 */
 #define APP_INIT_ADC                (1UL << 4)  /* ADC 采样初始化完成 */
 #define APP_INIT_DEBUG              (1UL << 5)  /* 调试串口初始化完成 */
+#define APP_INIT_UWB                (1UL << 6)  /* UWB 初始化完成 */
 
 #ifdef __cplusplus
 }

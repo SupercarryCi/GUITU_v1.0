@@ -132,6 +132,22 @@ typedef enum
  */
 pft_status_t PFT_BodyAccelToPedestrian(const pft_input_t *input, pft_output_t *output);
 
+/*
+ * 将 PDR 单步前向距离投影成行人/导航水平坐标下的位移增量。
+ * 当前工程约定：X 指东，Y 指北，yaw=0 时前向沿 +Y。
+ *
+ * 输入：
+ *   step_distance_m : 本步前向距离，单位 m
+ *   yaw_deg         : 当前航向角，单位 deg
+ *
+ * 输出：
+ *   delta_ped_m.x/y : 水平位移增量，单位 m
+ *   delta_ped_m.z   : 固定为 0，竖直位移由 INS/气压计等模块处理
+ */
+pft_status_t PFT_StepDistanceToPedDelta(float step_distance_m,
+                                        float yaw_deg,
+                                        pft_vec3f_t *delta_ped_m);
+
 #ifdef __cplusplus
 }
 #endif

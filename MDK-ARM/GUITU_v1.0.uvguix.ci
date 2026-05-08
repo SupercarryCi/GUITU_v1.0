@@ -93,8 +93,8 @@
       <flags>2</flags>
       <showCmd>3</showCmd>
       <MinPosition>
-        <xPos>-32000</xPos>
-        <yPos>-32000</yPos>
+        <xPos>-1</xPos>
+        <yPos>-1</yPos>
       </MinPosition>
       <MaxPosition>
         <xPos>-1</xPos>
@@ -1938,7 +1938,7 @@
       <Doc>
         <Name>..\Core\Task\task_gyro.c</Name>
         <ColumnNumber>0</ColumnNumber>
-        <TopLine>178</TopLine>
+        <TopLine>164</TopLine>
         <CurrentLine>181</CurrentLine>
         <Folding>1</Folding>
         <ContractedFolders></ContractedFolders>

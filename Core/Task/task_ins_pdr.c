@@ -7,10 +7,15 @@
 #include "pedestrian_frame_transform.h"
 #include "pedestrian_inertial_nav.h"
 
+#include <math.h>
+
 #define INS_PDR_DT_S 0.005f   /* 陀螺仪频率200Hz */
 
 static PdrStepDetector s_pdr_det;
 static pin_context_t s_pin_ctx;
+static pin_vec3f_t s_last_ins_position_m;
+static uint8_t s_has_last_ins_position = 0U;
+
 
 void Task_Ins_Pdr_Entry(void *argument)
 {
@@ -94,50 +99,67 @@ void Task_Ins_Pdr_Entry(void *argument)
                 continue;
             }
 
-            /*两种导航算法切换逻辑:纯角度...*/
-            if(abs(gyro.frame.angle_deg[0]) < 30.0f && abs(gyro.frame.angle_deg[1]) < 30.0f)
+            /*计算ins增量*/
+
+            pft_vec3f_t ins_delta_m;
+
+            if (s_has_last_ins_position == 0U)
             {
-                /*纯PDR*/
-                float pdr_delta = pdr_out.delta_distance_m;
-
-                App_StateGetNav(&nav);
-
-                nav.update_count++;
-
-                nav.data.position_m[0] += pdr_out.delta_distance_m * cosf(gyro.frame.angle_deg[2]);
-                nav.data.position_m[1] += pdr_out.delta_distance_m * sinf(gyro.frame.angle_deg[2]);
-                nav.data.position_m[2] = 0;//因为是在手臂而非足端，所以目前没做z轴，需要气压计等进行完善
-
-                nav.data.YAW_deg = gyro.frame.angle_deg[2];
-
-                App_StateSetNav(&nav);
-                osEventFlagsSet(g_sysEventFlags, SYS_EVT_NAV_UPDATED);
+                s_last_ins_position_m = pin_state.position_ped_m;
+                s_has_last_ins_position = 1U;
+                ins_delta_m.x = 0.0f;
+                ins_delta_m.y = 0.0f;
+                ins_delta_m.z = 0.0f;
             }
             else
             {
-                /*惯性导航*/
-                App_StateGetNav(&nav);
+                ins_delta_m.x = pin_state.position_ped_m.x - s_last_ins_position_m.x;
+                ins_delta_m.y = pin_state.position_ped_m.y - s_last_ins_position_m.y;
+                ins_delta_m.z = pin_state.position_ped_m.z - s_last_ins_position_m.z;
 
-                nav.update_count++;
-
-                nav.data.position_m[0] = pin_state.position_ped_m.x;
-                nav.data.position_m[1] = pin_state.position_ped_m.y;
-                nav.data.position_m[2] = pin_state.position_ped_m.z;
-
-                nav.data.velocity_mps[0] = pin_state.velocity_ped_mps.x;
-                nav.data.velocity_mps[1] = pin_state.velocity_ped_mps.y;
-                nav.data.velocity_mps[2] = pin_state.velocity_ped_mps.z;
-
-                nav.data.attitude_rad[0] = gyro.frame.angle_deg[0] * 0.0174532925f;
-                nav.data.attitude_rad[1] = gyro.frame.angle_deg[1] * 0.0174532925f;
-                nav.data.attitude_rad[2] = gyro.frame.angle_deg[2] * 0.0174532925f;
-
-                nav.data.YAW_deg = gyro.frame.angle_deg[2];
-
-                App_StateSetNav(&nav);
-                osEventFlagsSet(g_sysEventFlags, SYS_EVT_NAV_UPDATED);
+                s_last_ins_position_m = pin_state.position_ped_m;
             }
 
+            /*两种导航算法切换逻辑:纯角度...*/
+            pft_vec3f_t selected_delta_m = {0};
+            uint8_t use_pdr = 0U;
+
+            if ((fabsf(gyro.frame.angle_deg[0]) < 30.0f) &&
+                (fabsf(gyro.frame.angle_deg[1]) < 30.0f))
+            {
+                if (PFT_StepDistanceToPedDelta(pdr_out.delta_distance_m,
+                                   gyro.frame.angle_deg[2],
+                                   &selected_delta_m) == PFT_OK)
+                {
+                    use_pdr = 1U;
+                }
+            }
+
+            if (use_pdr == 0U)
+            {
+                selected_delta_m = ins_delta_m;
+            }
+
+            App_StateGetNav(&nav);
+
+            nav.update_count++;
+
+            nav.data.position_m[0] += selected_delta_m.x;
+            nav.data.position_m[1] += selected_delta_m.y;
+            nav.data.position_m[2] += selected_delta_m.z;
+
+            nav.data.velocity_mps[0] = pin_state.velocity_ped_mps.x;
+            nav.data.velocity_mps[1] = pin_state.velocity_ped_mps.y;
+            nav.data.velocity_mps[2] = pin_state.velocity_ped_mps.z;
+
+            nav.data.attitude_rad[0] = gyro.frame.angle_deg[0] * 0.0174532925f;
+            nav.data.attitude_rad[1] = gyro.frame.angle_deg[1] * 0.0174532925f;
+            nav.data.attitude_rad[2] = gyro.frame.angle_deg[2] * 0.0174532925f;
+
+            nav.data.YAW_deg = gyro.frame.angle_deg[2];
+
+            App_StateSetNav(&nav);
+            osEventFlagsSet(g_sysEventFlags, SYS_EVT_NAV_UPDATED);
         }
     }
 }

@@ -1,5 +1,6 @@
 #include "task_gyro.h"
 #include "wit_imu.h"
+#include "gtm1000_tag.h"
 
 #include "app_config.h"
 #include "app_event.h"
@@ -217,3 +218,13 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
         }
     }
 }
+
+int32_t Task_UWBInitHardware(void)
+{
+    if (GTM1000_TagInit(&APP_UWB_UART_HANDLE) != GTM1000_TAG_OK)
+    {
+        return -1;
+    }
+    return 0;
+}
+

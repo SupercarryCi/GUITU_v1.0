@@ -220,6 +220,30 @@ pft_status_t PFT_BodyAccelToPedestrian(const pft_input_t *input, pft_output_t *o
     /* 到这里为止：
      * - accel_ped_mps2        ：已变换到行人坐标系，但仍保留重力
      * - linear_accel_ped_mps2 ：已变换到行人坐标系，并完成去重力
+    */
+    return PFT_OK;
+}
+
+pft_status_t PFT_StepDistanceToPedDelta(float step_distance_m,
+                                        float yaw_deg,
+                                        pft_vec3f_t *delta_ped_m)
+{
+    float yaw_rad;
+
+    if (delta_ped_m == 0)
+    {
+        return PFT_ERR_NULL;
+    }
+
+    yaw_rad = pft_deg_to_rad(yaw_deg);
+
+    /*
+     * 当前工程约定：X 指东，Y 指北，yaw=0 时前向沿 +Y。
+     * 这里按航向角从北开始、向东为正进行水平投影。
      */
+    delta_ped_m->x = step_distance_m * sinf(yaw_rad);
+    delta_ped_m->y = step_distance_m * cosf(yaw_rad);
+    delta_ped_m->z = 0.0f;
+
     return PFT_OK;
 }
