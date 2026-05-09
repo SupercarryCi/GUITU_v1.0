@@ -24,11 +24,20 @@
 #include "app_state.h"
 #include "cmsis_os.h"
 
+#include <math.h>
 #include <string.h>
 
 static uint16_t s_adcDmaBuffer[APP_ADC_CHANNEL_COUNT] __attribute__((section(".dma_buffer"), aligned(32)));//哇还有陷阱
 
 static volatile uint32_t s_adcDmaErrorCount = 0U;
+
+float compute_gas_concentration(float A,float B,uint16_t V0,uint16_t VAO)
+{
+    float term1 = (3300.0f/VAO) -1.0f;
+    float term2 = (3300.0f/V0) -1.0f;
+    float ratio = term1 / term2;
+    return A/powf(ratio, B);
+}
 
 int32_t Task_AdcInitHardware(void)
 {
@@ -69,23 +78,16 @@ void Task_AdcEntry(void *argument)
                 for (i = 0U; i < APP_ADC_CHANNEL_COUNT; i++)
                 {
                     adc.raw[i] = s_adcDmaBuffer[i];
-
-                    /* 待完善：如果两路 ADC 对应不同传感器/分压比例，在这里替换换算公式。 */
-                    /* 电压换算公式：
-                     *   V_ch = raw * VREF / FULL_SCALE
-                     * 其中 FULL_SCALE = 2^分辨率 - 1（如 12bit 对应 4095）。
-                     * 乘法先做 uint32_t 扩展，避免 uint16_t 溢出。 */
-
-                    //其实不必换算，在这里实现气体浓度的计算即可
                     adc.voltage_mv[i] = (uint16_t)(((uint32_t)s_adcDmaBuffer[i] * APP_ADC_VREF_MV) /
                                                    APP_ADC_FULL_SCALE);
+                    adc.gas_concentration[i] = compute_gas_concentration(ADC_A, ADC_B, ADC_V0, adc.voltage_mv[i]);//浓度换算公式
+                    App_DebugLog("gas[%lu]=%.2f", (unsigned long)i, (double)adc.gas_concentration[i]);
+
                 }
 
                 adc.update_count++; 
                 adc.error_count = s_adcDmaErrorCount;
                 App_StateSetAdc(&adc);      //更新全局 ADC 状态
-                App_DebugLog("ADC Done");   //测试用
-
                 osEventFlagsSet(g_sysEventFlags, SYS_EVT_ADC_UPDATED);
                 HAL_ADC_Stop_DMA(&APP_ADC_HANDLE);
             }
@@ -123,3 +125,5 @@ void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *hadc)
         s_adcDmaErrorCount++;
     }
 }
+
+

@@ -68,10 +68,11 @@ typedef struct
 
 typedef struct
 {
-    uint16_t raw[APP_ADC_CHANNEL_COUNT];        /* 各通道原始采样值 */
-    uint16_t voltage_mv[APP_ADC_CHANNEL_COUNT]; /* 换算后的电压值 (mV) */
-    uint32_t update_count;                      /* 累计采样次数 */
-    uint32_t error_count;                       /* 采样错误次数 */
+    uint16_t raw[APP_ADC_CHANNEL_COUNT];                    /* 各通道原始采样值 */
+    uint16_t voltage_mv[APP_ADC_CHANNEL_COUNT];             /* 换算后的电压值 (mV) */
+    float gas_concentration[APP_ADC_CHANNEL_COUNT];         /* 根据电压换算的气体浓度*/
+    uint32_t update_count;                                  /* 累计采样次数 */
+    uint32_t error_count;                                   /* 采样错误次数 */
 } AdcState_t;
 
 typedef struct
