@@ -135,8 +135,18 @@ static void InitTask(void *argument)
     }
 
     osEventFlagsSet(g_sysEventFlags, SYS_EVT_INIT_DONE);
-    App_DebugLog("system init done mask=0x%08lX", (unsigned long)done_mask);
-    osThreadExit();
+    App_DebugLog("init mask=0x%08lX", (unsigned long)done_mask);
+
+    /*
+     * 不删除 InitTask。删除任务会交给 idle task 调用
+     * prvCheckTasksWaitingTermination() 清理 TCB，调试时容易误判为卡死。
+     * 初始化完成后挂起即可，业务任务已经全部启动。
+     */
+    (void)osThreadSuspend(osThreadGetId());
+    for (;;)
+    {
+        osDelay(osWaitForever);
+    }
 }
 
 static int32_t App_InitPeripherals(uint32_t *done_mask)
@@ -246,7 +256,7 @@ static int32_t App_StartRuntimeTasks(void)
     const osThreadAttr_t ins_pdr_TaskAttr = {
         .name = "ins_pdr_Task",
         .priority = osPriorityAboveNormal,
-        .stack_size = 2048U
+        .stack_size = 3072U
     };
 
     g_gyroTaskHandle = osThreadNew(Task_GyroEntry, NULL, &gyroTaskAttr);

@@ -42,12 +42,11 @@ extern "C" {
 
 #define APP_UI_PERIOD_MS            50U         /* UI 刷新周期 (20Hz) ?*/
 #define APP_SPO2_PERIOD_MS          500U        /* 血氧采集周期 (2Hz) */
-#define APP_LORA_PERIOD_MS          200U        /* LoRa 收发周期 (5Hz) */
+#define APP_LORA_PERIOD_MS          1000U       /* LoRa 收发周期 (1Hz) */
 #define APP_RETURN_PERIOD_MS        100U        /* 返航控制周期 (10Hz) */
 
-/* LoRa is reserved by default. Set to 1 after the radio driver is ready. */
 /* LoRa 当前只预留框架，默认不启用真实收发任务。 */
-#define APP_LORA_ENABLE_DEFAULT     0U
+#define APP_LORA_ENABLE_DEFAULT     1U
 
 #define APP_INIT_GYRO_DMA           (1UL << 0)  /* 陀螺仪 DMA 接收启动完成 */
 #define APP_INIT_UI                 (1UL << 1)  /* UI 硬件初始化完成 */

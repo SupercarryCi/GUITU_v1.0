@@ -4,6 +4,11 @@
 static e22_lora_stm32_hal_config_t stm32_cfg;
 static uint32_t saved_primask;
 
+static bool is_gpio_valid(e22_lora_stm32_gpio_t gpio)
+{
+    return ((gpio.port != 0) && (gpio.pin != 0U));
+}
+
 static e22_lora_stm32_gpio_t get_gpio(e22_lora_pin_t pin)
 {
     switch (pin)
@@ -45,6 +50,11 @@ static void stm32_gpio_write(void *user, e22_lora_pin_t pin, bool level)
 
     (void)user;
     gpio = get_gpio(pin);
+    if (is_gpio_valid(gpio) == false)
+    {
+        return;
+    }
+
     HAL_GPIO_WritePin(gpio.port, gpio.pin, level ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
@@ -54,6 +64,11 @@ static bool stm32_gpio_read(void *user, e22_lora_pin_t pin)
 
     (void)user;
     gpio = get_gpio(pin);
+    if (is_gpio_valid(gpio) == false)
+    {
+        return false;
+    }
+
     return (HAL_GPIO_ReadPin(gpio.port, gpio.pin) == GPIO_PIN_SET);
 }
 
@@ -101,7 +116,9 @@ bool e22_lora_stm32_hal_bind(const e22_lora_stm32_hal_config_t *config)
 {
     e22_lora_port_t port;
 
-    if ((config == 0) || (config->hspi == 0))
+    if ((config == 0) || (config->hspi == 0) ||
+        (is_gpio_valid(config->nss) == false) ||
+        (is_gpio_valid(config->busy) == false))
     {
         return false;
     }
@@ -117,9 +134,18 @@ bool e22_lora_stm32_hal_bind(const e22_lora_stm32_hal_config_t *config)
     }
 
     HAL_GPIO_WritePin(stm32_cfg.nss.port, stm32_cfg.nss.pin, GPIO_PIN_SET);
-    HAL_GPIO_WritePin(stm32_cfg.reset.port, stm32_cfg.reset.pin, GPIO_PIN_SET);
-    HAL_GPIO_WritePin(stm32_cfg.txen.port, stm32_cfg.txen.pin, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(stm32_cfg.rxen.port, stm32_cfg.rxen.pin, GPIO_PIN_RESET);
+    if (is_gpio_valid(stm32_cfg.reset) == true)
+    {
+        HAL_GPIO_WritePin(stm32_cfg.reset.port, stm32_cfg.reset.pin, GPIO_PIN_SET);
+    }
+    if (is_gpio_valid(stm32_cfg.txen) == true)
+    {
+        HAL_GPIO_WritePin(stm32_cfg.txen.port, stm32_cfg.txen.pin, GPIO_PIN_RESET);
+    }
+    if (is_gpio_valid(stm32_cfg.rxen) == true)
+    {
+        HAL_GPIO_WritePin(stm32_cfg.rxen.port, stm32_cfg.rxen.pin, GPIO_PIN_RESET);
+    }
 
     port.user = 0;
     port.delay_ms = stm32_delay_ms;

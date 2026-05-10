@@ -52,7 +52,7 @@ void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOE, D_C_Pin|RESET_t_Pin|BUZZER_Pin|SPI4_CS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOE, D_C_Pin|RESET_t_Pin|BUZZER_Pin|E22_NSS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET);
@@ -61,22 +61,22 @@ void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, TXEN_Pin|RXEN_Pin|SOS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, E22_TXEN_Pin|E22_RXEN_Pin|SOS_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : LED_Pin */
-  GPIO_InitStruct.Pin = LED_Pin;
+  /*Configure GPIO pins : LED_Pin E22_DIO1_Pin */
+  GPIO_InitStruct.Pin = LED_Pin|E22_DIO1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : IRQ_Pin BUSY_Pin DIO1_Pin */
-  GPIO_InitStruct.Pin = IRQ_Pin|BUSY_Pin|DIO1_Pin;
+  /*Configure GPIO pins : IRQ_Pin E22_BUSY_Pin */
+  GPIO_InitStruct.Pin = IRQ_Pin|E22_BUSY_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : D_C_Pin RESET_t_Pin BUZZER_Pin SPI4_CS_Pin */
-  GPIO_InitStruct.Pin = D_C_Pin|RESET_t_Pin|BUZZER_Pin|SPI4_CS_Pin;
+  /*Configure GPIO pins : D_C_Pin RESET_t_Pin BUZZER_Pin E22_NSS_Pin */
+  GPIO_InitStruct.Pin = D_C_Pin|RESET_t_Pin|BUZZER_Pin|E22_NSS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -96,12 +96,16 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(SPI1_CS_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : TXEN_Pin RXEN_Pin SOS_Pin */
-  GPIO_InitStruct.Pin = TXEN_Pin|RXEN_Pin|SOS_Pin;
+  /*Configure GPIO pins : E22_TXEN_Pin E22_RXEN_Pin SOS_Pin */
+  GPIO_InitStruct.Pin = E22_TXEN_Pin|E22_RXEN_Pin|SOS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /* PE10(E22_DIO1) 使用 EXTI15_10；优先级 5 允许在 ISR 中置 RTOS 事件位。 */
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 }
 
