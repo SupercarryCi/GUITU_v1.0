@@ -6,36 +6,182 @@
 #include "app_rtos.h"
 #include "app_state.h"
 #include "cmsis_os.h"
-#include "main.h"
+#include "tft_port_stm32_hal.h"
 
 #include <string.h>
 
 /*
  * UI 链路：
- * 周期读取 AppSnapshot_t 刷屏，同时轮询触摸。
- * 触摸产生 AppCommandMsg_t，由 ControlTask 统一分发。
+ * 1. 绑定 ILI9488 + XPT2046 驱动。
+ * 2. UiTask 周期读取系统快照，统一刷新 LCD。
+ * 3. 触摸坐标通过 UI 命令队列交给 ControlTask，业务层再解释坐标含义。
  */
-/* 待你完善：初始化屏幕控制器、背光、触摸控制器等真实 UI 硬件。 */
-__weak int32_t App_UiHardwareInit(void)
+
+static uint8_t s_uiFirstRender = 1U;
+static uint8_t s_touchPressed = 0U;
+
+static uint16_t Ui_BarWidthU32(uint32_t value, uint32_t max_value, uint16_t max_width)
 {
-    HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_SET);
-    HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET);
-    HAL_GPIO_WritePin(RESET_t_GPIO_Port, RESET_t_Pin, GPIO_PIN_SET);
+    if ((max_value == 0U) || (value >= max_value))
+    {
+        return max_width;
+    }
+
+    return (uint16_t)((value * max_width) / max_value);
+}
+
+static uint16_t Ui_BarWidthFloat(float value, float max_value, uint16_t max_width)
+{
+    if (value <= 0.0f)
+    {
+        return 0U;
+    }
+    if ((max_value <= 0.0f) || (value >= max_value))
+    {
+        return max_width;
+    }
+
+    return (uint16_t)((value * (float)max_width) / max_value);
+}
+
+int32_t App_UiHardwareInit(void)
+{
+    if (TFT_Port_Init() != 0)
+    {
+        return -1;
+    }
+
+    (void)ILI9488_Fill(&g_lcd, ILI9488_COLOR_BLACK);
     return 0;
 }
 
-/* 待你完善：根据 snapshot 绘制导航、血氧、ADC、LoRa、返航状态等界面。 */
-__weak void App_UiRender(const AppSnapshot_t *snapshot)
+void App_UiRender(const AppSnapshot_t *snapshot)
 {
-    /* 业务接入点：在这里使用 snapshot 更新屏幕显示内容。 */
-    (void)snapshot;
+    uint16_t width;
+    uint16_t bar_width;
+    uint16_t y;
+
+    if (snapshot == NULL)
+    {
+        return;
+    }
+
+    width = g_lcd.width;
+    if (width < 40U)
+    {
+        return;
+    }
+
+    if (s_uiFirstRender != 0U)
+    {
+        (void)ILI9488_Fill(&g_lcd, ILI9488_COLOR_BLACK);
+        s_uiFirstRender = 0U;
+    }
+
+    /* 顶部状态条：绿色表示初始化完成且无初始化错误，红色表示初始化失败。 */
+    (void)ILI9488_FillRect(&g_lcd,
+                           0U,
+                           0U,
+                           width,
+                           18U,
+                           (snapshot->system.init_result == 0) ? ILI9488_COLOR_GREEN : ILI9488_COLOR_RED);
+
+    bar_width = (uint16_t)(width - 24U);
+    y = 34U;
+
+    /* ADC0 / ADC1 电压条。 */
+    (void)ILI9488_FillRect(&g_lcd, 12U, y, bar_width, 14U, ILI9488_COLOR_BLUE);
+    (void)ILI9488_FillRect(&g_lcd,
+                           12U,
+                           y,
+                           Ui_BarWidthU32(snapshot->adc.voltage_mv[0], APP_ADC_VREF_MV, bar_width),
+                           14U,
+                           ILI9488_COLOR_CYAN);
+
+    y = (uint16_t)(y + 24U);
+    (void)ILI9488_FillRect(&g_lcd, 12U, y, bar_width, 14U, ILI9488_COLOR_BLUE);
+    (void)ILI9488_FillRect(&g_lcd,
+                           12U,
+                           y,
+                           Ui_BarWidthU32(snapshot->adc.voltage_mv[1], APP_ADC_VREF_MV, bar_width),
+                           14U,
+                           ILI9488_COLOR_YELLOW);
+
+    y = (uint16_t)(y + 24U);
+    (void)ILI9488_FillRect(&g_lcd, 12U, y, bar_width, 14U, ILI9488_COLOR_BLUE);
+    (void)ILI9488_FillRect(&g_lcd,
+                           12U,
+                           y,
+                           Ui_BarWidthFloat(snapshot->adc.gas_concentration[0], 1000.0f, bar_width),
+                           14U,
+                           ILI9488_COLOR_GREEN);
+
+    y = (uint16_t)(y + 24U);
+    (void)ILI9488_FillRect(&g_lcd, 12U, y, bar_width, 14U, ILI9488_COLOR_BLUE);
+    (void)ILI9488_FillRect(&g_lcd,
+                           12U,
+                           y,
+                           Ui_BarWidthFloat(snapshot->adc.gas_concentration[1], 1000.0f, bar_width),
+                           14U,
+                           ILI9488_COLOR_MAGENTA);
+
+    y = (uint16_t)(y + 32U);
+    (void)ILI9488_FillRect(&g_lcd, 12U, y, bar_width, 12U, ILI9488_COLOR_BLUE);
+    (void)ILI9488_FillRect(&g_lcd,
+                           12U,
+                           y,
+                           Ui_BarWidthU32(snapshot->spo2.spo2_percent, 100U, bar_width),
+                           12U,
+                           ILI9488_COLOR_RED);
+
+    /* 底部色块：LoRa、返航、触摸状态。 */
+    y = (uint16_t)(g_lcd.height - 28U);
+    (void)ILI9488_FillRect(&g_lcd, 0U, y, width, 28U, ILI9488_COLOR_BLACK);
+    (void)ILI9488_FillRect(&g_lcd,
+                           6U,
+                           (uint16_t)(y + 6U),
+                           42U,
+                           16U,
+                           (snapshot->lora.error_count == 0U) ? ILI9488_COLOR_GREEN : ILI9488_COLOR_RED);
+    (void)ILI9488_FillRect(&g_lcd,
+                           58U,
+                           (uint16_t)(y + 6U),
+                           42U,
+                           16U,
+                           (snapshot->return_home.mode == RETURN_MODE_IDLE) ? ILI9488_COLOR_BLUE : ILI9488_COLOR_YELLOW);
+    (void)ILI9488_FillRect(&g_lcd,
+                           110U,
+                           (uint16_t)(y + 6U),
+                           42U,
+                           16U,
+                           (snapshot->ui.touch_count == 0U) ? ILI9488_COLOR_BLUE : ILI9488_COLOR_CYAN);
 }
 
-/* 待你完善：扫描触摸屏，把用户操作转换为 AppCommandMsg_t。 */
-__weak int32_t App_UiPollTouch(AppCommandMsg_t *command)
+int32_t App_UiPollTouch(AppCommandMsg_t *command)
 {
-    /* 业务接入点：检测到有效触摸命令时填充 command 并返回 >0。 */
-    (void)command;
+    XPT2046_Point point;
+
+    if (command == NULL)
+    {
+        return 0;
+    }
+
+    if (XPT2046_ReadScreen(&g_touch, &point) == 0)
+    {
+        if (s_touchPressed != 0U)
+        {
+            return 0;
+        }
+
+        s_touchPressed = 1U;
+        memset(command, 0, sizeof(*command));
+        command->id = APP_CMD_USER_BASE;
+        command->param0 = point.x;
+        command->param1 = point.y;
+        return 1;
+    }
+
+    s_touchPressed = 0U;
     return 0;
 }
 
@@ -66,7 +212,6 @@ void Task_UiEntry(void *argument)
         memset(&snapshot, 0, sizeof(snapshot));
         App_StateGetSnapshot(&snapshot);
 
-        /* 显示 SPI 和触摸 SPI 分开加锁，避免两个设备操作互相打断。 */
         if (osMutexAcquire(g_spiDisplayMutex, osWaitForever) == osOK)
         {
             App_UiRender(&snapshot);
@@ -84,7 +229,7 @@ void Task_UiEntry(void *argument)
                     ui.last_command = command;
                     ui.command_count++;
                     ui.touch_count++;
-                    osEventFlagsSet(g_sysEventFlags, SYS_EVT_UI_COMMAND);
+                    (void)osEventFlagsSet(g_sysEventFlags, SYS_EVT_UI_COMMAND);
                 }
             }
             osMutexRelease(g_spiTouchMutex);

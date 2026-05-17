@@ -79,6 +79,7 @@ void Error_Handler(void);
 #define E22_BUSY_GPIO_Port GPIOE
 #define E22_DIO1_Pin GPIO_PIN_10
 #define E22_DIO1_GPIO_Port GPIOE
+#define E22_DIO1_EXTI_IRQn EXTI15_10_IRQn
 #define E22_NSS_Pin GPIO_PIN_11
 #define E22_NSS_GPIO_Port GPIOE
 #define SOS_Pin GPIO_PIN_12

@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>USE_PWR_LDO_SUPPLY,USE_HAL_DRIVER,STM32H743xx</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32H7xx/Include;../Drivers/CMSIS/Include;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Core/App;../Core/Task;../Core/PeripheralDriver;../Core/Algorithm Component;..\Core\PeripheralDriver\sx126x_driver</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32H7xx/Include;../Drivers/CMSIS/Include;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Core/App;../Core/Task;../Core/PeripheralDriver;../Core/Algorithm Component;../Core/PeripheralDriver/sx126x_driver</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -1509,6 +1509,36 @@
               <FileName>gtm1000_tag.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\Core\PeripheralDriver\gtm1000_tag.h</FilePath>
+            </File>
+            <File>
+              <FileName>ili9488.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\PeripheralDriver\ili9488.c</FilePath>
+            </File>
+            <File>
+              <FileName>ili9488.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Core\PeripheralDriver\ili9488.h</FilePath>
+            </File>
+            <File>
+              <FileName>xpt2046.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\PeripheralDriver\xpt2046.c</FilePath>
+            </File>
+            <File>
+              <FileName>xpt2046.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Core\PeripheralDriver\xpt2046.h</FilePath>
+            </File>
+            <File>
+              <FileName>tft_port_stm32_hal.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\PeripheralDriver\tft_port_stm32_hal.c</FilePath>
+            </File>
+            <File>
+              <FileName>tft_port_stm32_hal.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Core\PeripheralDriver\tft_port_stm32_hal.h</FilePath>
             </File>
           </Files>
         </Group>
