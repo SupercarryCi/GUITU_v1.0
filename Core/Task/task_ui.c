@@ -8,18 +8,127 @@
 #include "cmsis_os.h"
 #include "tft_port_stm32_hal.h"
 
+#include <math.h>
+#include <stdio.h>
 #include <string.h>
 
-/*
- * UI é“¾è·¯ï¼š
- * 1. ç»‘å®š ILI9488 + XPT2046 é©±åŠ¨ã€‚
- * 2. UiTask å‘¨æœŸè¯»å–ç³»ç»Ÿå¿«ç…§ï¼Œç»Ÿä¸€åˆ·æ–° LCDã€‚
- * 3. è§¦æ‘¸åæ ‡é€šè¿‡ UI å‘½ä»¤é˜Ÿåˆ—äº¤ç»™ ControlTaskï¼Œä¸šåŠ¡å±‚å†è§£é‡Šåæ ‡å«ä¹‰ã€‚
- */
+#define icon_data g_iconNgasData
+#define Icon IconNgas_t
+#define my_icon g_iconNgas
+#include "../../ÌìÈ»Æø.h"
+#undef icon_data
+#undef Icon
+#undef my_icon
 
-static uint8_t s_uiFirstRender = 1U;
-static uint8_t s_touchPressed = 0U;
+#define icon_data g_iconLpgData
+#define Icon IconLpg_t
+#define my_icon g_iconLpg
+#include "../../Òº»¯Æø.h"
+#undef icon_data
+#undef Icon
+#undef my_icon
 
+#define icon_data g_iconHrData
+#define Icon IconHr_t
+#define my_icon g_iconHr
+#include "../../ĞÄÂÊ.h"
+#undef icon_data
+#undef Icon
+#undef my_icon
+
+#define icon_data g_iconSpo2Data
+#define Icon IconSpo2_t
+#define my_icon g_iconSpo2
+#include "../../ÑªÑõ.h"
+#undef icon_data
+#undef Icon
+#undef my_icon
+
+#define UI_RGB565(r, g, b)    (uint16_t)((((uint16_t)(r) & 0xF8U) << 8) | (((uint16_t)(g) & 0xFCU) << 3) | ((uint16_t)(b) >> 3))
+
+#define UI_COLOR_BG           UI_RGB565(7U, 12U, 18U)      /*±³¾°É«£¬ÉîÀ¶ºÚ*/
+#define UI_COLOR_PANEL        UI_RGB565(20U, 29U, 39U)     /*¿¨Æ¬µ×É«£¬ÉîÀ¶»Ò*/
+#define UI_COLOR_PANEL_2      UI_RGB565(28U, 39U, 52U)     /*½ø¶ÈÌõ¹ìµÀÉ«£¬ÂÔÇ³ÉîÀ¶»Ò*/
+#define UI_COLOR_TEXT         ILI9488_COLOR_WHITE
+#define UI_COLOR_MUTED        UI_RGB565(132U, 148U, 164U)  /*¸¨ÖúÎÄ×ÖÉ«£¬»ÒÀ¶*/
+#define UI_COLOR_NGAS         UI_RGB565(250U, 204U, 21U)   /*ÌìÈ»Æø¿¨Æ¬É«£¬»Æ*/
+#define UI_COLOR_LPG          UI_RGB565(56U, 189U, 248U)   /*Òº»¯Æø¿¨Æ¬É«£¬ÌìÀ¶*/
+#define UI_COLOR_HR           UI_RGB565(248U, 113U, 113U)  /*ĞÄÂÊ¿¨Æ¬É«£¬ºì*/
+#define UI_COLOR_SPO2         UI_RGB565(45U, 212U, 191U)   /*ÑªÑõ¿¨Æ¬É«£¬ÂÌ*/
+#define UI_COLOR_ACTION       UI_RGB565(59U, 130U, 246U)   /*²Ù×÷°´Å¥É«£¬À¶*/
+
+#define UI_LEFT_X             8U     //×ó²àÃæ°åÆğÊ¼x×ø±ê
+#define UI_LEFT_W             270U   //×ó²àÃæ°å¿í¶È
+#define UI_CARD_H             72U    //×´Ì¬¿¨Æ¬¸ß¶È
+#define UI_CARD_GAP           6U     //×´Ì¬¿¨Æ¬¼ä¸ô
+#define UI_RIGHT_X            288U   //ÓÒ²àÃæ°åÆğÊ¼x×ø±ê
+#define UI_RIGHT_W            184U   //ÓÒ²àÃæ°å¿í¶È
+#define UI_QUICK_CX           380U   //¿ìËÙ²Ù×÷Ô²ÖĞĞÄx×ø±ê
+#define UI_QUICK_CY           86U    //¿ìËÙ²Ù×÷Ô²ÖĞĞÄy×ø±ê
+#define UI_QUICK_R            66U    //¿ìËÙ²Ù×÷Ô²°ë¾¶
+#define UI_HOME_BTN_Y         234U   //Ö÷Ò³°´Å¥y×ø±ê
+#define UI_HOME_BTN_H         76U    //Ö÷Ò³°´Å¥¸ß¶È
+#define UI_GAS_BAR_MAX_PPM    50000U //ÆøÌåÅ¨¶ÈÌõ×î´óÖµ
+#define UI_PI                 3.14159265358979323846f
+#define UI_STATUS_ICON_SIZE   48U
+#define UI_STATUS_VALUE_X_OFF 70U    //×´Ì¬À¸ÊıÖµxÆ«ÒÆ
+#define UI_STATUS_VALUE_Y_OFF 36U    //×´Ì¬À¸ÊıÖµyÆ«ÒÆ
+#define UI_STATUS_VALUE_W     128U   //×´Ì¬À¸ÊıÖµË¢ĞÂ¿í¶È
+#define UI_STATUS_VALUE_H     18U    //×´Ì¬À¸ÊıÖµË¢ĞÂ¸ß¶È
+#define UI_BASE_TEXT          "BASE" //BASEÔ²ĞÎ°´Å¥±êÌâ
+#define UI_BASE_TEXT_X_OFF    (-20)
+#define UI_BASE_TEXT_Y_OFF    (-30)
+#define UI_BASE_DIST_X_OFF    (-10)
+#define UI_BASE_DIST_Y_OFF    (-4)
+#define UI_BASE_SIG_X_OFF     (-20)
+#define UI_BASE_SIG_Y_OFF     24
+#define UI_HOME_TEXT_X_OFF    22U    //HOMEÎÄ×ÖxÆ«ÒÆ
+#define UI_HOME_TEXT_Y_OFF    28U    //HOMEÎÄ×ÖyÆ«ÒÆ
+#define UI_HOME_ICON_X_OFF    142U   //HOMEÍ¼±êxÆ«ÒÆ
+#define UI_HOME_ICON_Y_OFF    50U    //HOMEÍ¼±êyÆ«ÒÆ
+
+typedef enum
+{
+    UI_VIEW_MAIN = 0,  /*Éè¼ÆÈı¸ö×´Ì¬£ºÖ÷½çÃæ¡¢¿ì½İÍ¨ĞÅ¡¢·µº½Òıµ¼*/
+    UI_VIEW_QUICK,
+    UI_VIEW_RETURN
+} UiView_t;
+
+typedef enum
+{
+    UI_TOUCH_NONE = 0,    /*´¥Ãş²Ù×÷·ÖÀà*/
+    UI_TOUCH_QUICK,
+    UI_TOUCH_RETURN_START,
+    UI_TOUCH_RETURN_STOP,
+    UI_TOUCH_QUICK_SEND,
+    UI_TOUCH_QUICK_BACK
+} UiTouchAction_t;
+
+static uint8_t s_touchPressed = 0U;//´¥Ãş×´Ì¬Á¿
+static UiView_t s_view = UI_VIEW_MAIN;//ÊÓÍ¼×´Ì¬Á¿
+static UiView_t s_lastRenderedView = (UiView_t)0xFFU;//ÉÏ´ÎäÖÈ¾µÄÊÓÍ¼×´Ì¬Á¿£¬³õÊ¼ÖµÉèÖÃÎªÎŞĞ§ÖµÒÔÈ·±£Ê×´ÎäÖÈ¾
+static uint8_t s_mainValueValid = 0U;
+static uint32_t s_lastStatusValue[4];
+static uint16_t s_lastStatusBarW[4];
+static uint32_t s_lastBaseDistanceM = 0U;
+static uint8_t s_lastBaseSignal = 0U;
+
+
+/*½«¸¡µãÊı°²È«×ª»»ÎªÎŞ·ûºÅ 32 Î»ÕûÊı£¬ÓÃÓÚÏÔÊ¾*/
+static uint32_t Ui_FloatToU32(float value) 
+{
+    if (value <= 0.0f)
+    {
+        return 0U;
+    }
+    if (value >= 99999.0f)
+    {
+        return 99999U;
+    }
+    return (uint32_t)(value + 0.5f);
+}
+
+/*¼ÆËã½ø¶ÈÌõµÄÏñËØ¿í¶È£¬ÏßĞÔ±ÈÀıÓ³Éä*/
 static uint16_t Ui_BarWidthU32(uint32_t value, uint32_t max_value, uint16_t max_width)
 {
     if ((max_value == 0U) || (value >= max_value))
@@ -30,18 +139,783 @@ static uint16_t Ui_BarWidthU32(uint32_t value, uint32_t max_value, uint16_t max_
     return (uint16_t)((value * max_width) / max_value);
 }
 
-static uint16_t Ui_BarWidthFloat(float value, float max_value, uint16_t max_width)
+/*¼ÆËã»ù´¡¾àÀë£¬·µ»ØÒÔÃ×Îªµ¥Î»µÄÕûÊı*/
+static uint32_t Ui_BaseDistanceMeter(const AppSnapshot_t *snapshot)
 {
-    if (value <= 0.0f)
+    float x;
+    float y;
+    float z;
+
+    x = snapshot->nav.data.position_m[0];
+    y = snapshot->nav.data.position_m[1];
+    z = snapshot->nav.data.position_m[2];
+
+    return Ui_FloatToU32(sqrtf((x * x) + (y * y) + (z * z)));
+}
+
+/*
+ * ·µº½Òıµ¼Êı¾İ½Ó¿Ú¡£
+ * ºóĞø control/return ²à»º´æºÃÂ·Ïßºó£¬Ìá¹©Í¬Ãû·Ç weak º¯Êı¼´¿É¸²¸ÇÕâÀï¡£
+ */
+__weak int32_t App_UiGetReturnGuidance(const AppSnapshot_t *snapshot, UiReturnGuidance_t *guidance)
+{
+    if ((snapshot == NULL) || (guidance == NULL))
+    {
+        return -1;
+    }
+
+    guidance->valid = 0U;
+    guidance->heading_rad = 0.0f;
+    guidance->distance_m = Ui_BaseDistanceMeter(snapshot);
+    return 0;
+}
+
+/*ÒÀ¿¿lora»Ø´«µÄrssi¼ÆËãĞÅºÅÇ¿¶È°Ù·Ö±È£¬-120db¡ª¡ª-40db*/
+static uint8_t Ui_SignalPercent(const AppSnapshot_t *snapshot)
+{
+    int16_t rssi;
+
+    if (snapshot->lora.last_rx.rssi_valid == 0U)
     {
         return 0U;
     }
-    if ((max_value <= 0.0f) || (value >= max_value))
+
+    rssi = snapshot->lora.last_rx.rssi_dbm;
+    if (rssi <= -120)
     {
-        return max_width;
+        return 0U;
+    }
+    if (rssi >= -40)
+    {
+        return 100U;
     }
 
-    return (uint16_t)((value * (float)max_width) / max_value);
+    return (uint8_t)(((int32_t)rssi + 120) * 100 / 80);
+}
+
+
+static const uint8_t *Ui_Font5x7(char c)//°ëÀ­×Ö¿â
+{
+    static const uint8_t blank[7] = {0x00U, 0x00U, 0x00U, 0x00U, 0x00U, 0x00U, 0x00U};
+    static const uint8_t minus[7] = {0x00U, 0x00U, 0x00U, 0x1FU, 0x00U, 0x00U, 0x00U};
+    static const uint8_t colon[7] = {0x00U, 0x04U, 0x04U, 0x00U, 0x04U, 0x04U, 0x00U};
+    static const uint8_t pct[7] = {0x19U, 0x19U, 0x02U, 0x04U, 0x08U, 0x13U, 0x13U};
+    static const uint8_t n0[7] = {0x0EU, 0x11U, 0x13U, 0x15U, 0x19U, 0x11U, 0x0EU};
+    static const uint8_t n1[7] = {0x04U, 0x0CU, 0x04U, 0x04U, 0x04U, 0x04U, 0x0EU};
+    static const uint8_t n2[7] = {0x0EU, 0x11U, 0x01U, 0x02U, 0x04U, 0x08U, 0x1FU};
+    static const uint8_t n3[7] = {0x1FU, 0x02U, 0x04U, 0x02U, 0x01U, 0x11U, 0x0EU};
+    static const uint8_t n4[7] = {0x02U, 0x06U, 0x0AU, 0x12U, 0x1FU, 0x02U, 0x02U};
+    static const uint8_t n5[7] = {0x1FU, 0x10U, 0x1EU, 0x01U, 0x01U, 0x11U, 0x0EU};
+    static const uint8_t n6[7] = {0x06U, 0x08U, 0x10U, 0x1EU, 0x11U, 0x11U, 0x0EU};
+    static const uint8_t n7[7] = {0x1FU, 0x01U, 0x02U, 0x04U, 0x08U, 0x08U, 0x08U};
+    static const uint8_t n8[7] = {0x0EU, 0x11U, 0x11U, 0x0EU, 0x11U, 0x11U, 0x0EU};
+    static const uint8_t n9[7] = {0x0EU, 0x11U, 0x11U, 0x0FU, 0x01U, 0x02U, 0x0CU};
+    static const uint8_t A[7] = {0x0EU, 0x11U, 0x11U, 0x1FU, 0x11U, 0x11U, 0x11U};
+    static const uint8_t B[7] = {0x1EU, 0x11U, 0x11U, 0x1EU, 0x11U, 0x11U, 0x1EU};
+    static const uint8_t C[7] = {0x0EU, 0x11U, 0x10U, 0x10U, 0x10U, 0x11U, 0x0EU};
+    static const uint8_t D[7] = {0x1EU, 0x11U, 0x11U, 0x11U, 0x11U, 0x11U, 0x1EU};
+    static const uint8_t E[7] = {0x1FU, 0x10U, 0x10U, 0x1EU, 0x10U, 0x10U, 0x1FU};
+    static const uint8_t G[7] = {0x0EU, 0x11U, 0x10U, 0x17U, 0x11U, 0x11U, 0x0FU};
+    static const uint8_t H[7] = {0x11U, 0x11U, 0x11U, 0x1FU, 0x11U, 0x11U, 0x11U};
+    static const uint8_t I[7] = {0x0EU, 0x04U, 0x04U, 0x04U, 0x04U, 0x04U, 0x0EU};
+    static const uint8_t K[7] = {0x11U, 0x12U, 0x14U, 0x18U, 0x14U, 0x12U, 0x11U};
+    static const uint8_t L[7] = {0x10U, 0x10U, 0x10U, 0x10U, 0x10U, 0x10U, 0x1FU};
+    static const uint8_t M[7] = {0x11U, 0x1BU, 0x15U, 0x15U, 0x11U, 0x11U, 0x11U};
+    static const uint8_t N[7] = {0x11U, 0x19U, 0x15U, 0x13U, 0x11U, 0x11U, 0x11U};
+    static const uint8_t O[7] = {0x0EU, 0x11U, 0x11U, 0x11U, 0x11U, 0x11U, 0x0EU};
+    static const uint8_t P[7] = {0x1EU, 0x11U, 0x11U, 0x1EU, 0x10U, 0x10U, 0x10U};
+    static const uint8_t Q[7] = {0x0EU, 0x11U, 0x11U, 0x11U, 0x15U, 0x12U, 0x0DU};
+    static const uint8_t R[7] = {0x1EU, 0x11U, 0x11U, 0x1EU, 0x14U, 0x12U, 0x11U};
+    static const uint8_t S[7] = {0x0FU, 0x10U, 0x10U, 0x0EU, 0x01U, 0x01U, 0x1EU};
+    static const uint8_t T[7] = {0x1FU, 0x04U, 0x04U, 0x04U, 0x04U, 0x04U, 0x04U};
+    static const uint8_t U[7] = {0x11U, 0x11U, 0x11U, 0x11U, 0x11U, 0x11U, 0x0EU};
+    static const uint8_t V[7] = {0x11U, 0x11U, 0x11U, 0x11U, 0x11U, 0x0AU, 0x04U};
+    static const uint8_t X[7] = {0x11U, 0x11U, 0x0AU, 0x04U, 0x0AU, 0x11U, 0x11U};
+    static const uint8_t Y[7] = {0x11U, 0x11U, 0x0AU, 0x04U, 0x04U, 0x04U, 0x04U};
+
+    switch (c)
+    {
+        case '-': return minus;
+        case ':': return colon;
+        case '%': return pct;
+        case '0': return n0;
+        case '1': return n1;
+        case '2': return n2;
+        case '3': return n3;
+        case '4': return n4;
+        case '5': return n5;
+        case '6': return n6;
+        case '7': return n7;
+        case '8': return n8;
+        case '9': return n9;
+        case 'A': return A;
+        case 'B': return B;
+        case 'C': return C;
+        case 'D': return D;
+        case 'E': return E;
+        case 'G': return G;
+        case 'H': return H;
+        case 'I': return I;
+        case 'K': return K;
+        case 'L': return L;
+        case 'M': return M;
+        case 'N': return N;
+        case 'O': return O;
+        case 'P': return P;
+        case 'Q': return Q;
+        case 'R': return R;
+        case 'S': return S;
+        case 'T': return T;
+        case 'U': return U;
+        case 'V': return V;
+        case 'X': return X;
+        case 'Y': return Y;
+        default: return blank;
+    }
+}
+
+/*»æÖÆ×Ö·û*/
+static void Ui_DrawChar(uint16_t x, uint16_t y, char c, uint8_t scale, uint16_t color)
+{
+    const uint8_t *glyph;
+    uint8_t row;
+    uint8_t col;
+
+    glyph = Ui_Font5x7(c);
+    for (row = 0U; row < 7U; row++)
+    {
+        for (col = 0U; col < 5U; col++)
+        {
+            if ((glyph[row] & (uint8_t)(1U << (4U - col))) != 0U)
+            {
+                (void)ILI9488_FillRect(&g_lcd,
+                                       (uint16_t)(x + (uint16_t)col * scale),
+                                       (uint16_t)(y + (uint16_t)row * scale),
+                                       scale,
+                                       scale,
+                                       color);
+            }
+        }
+    }
+}
+
+/*´Ó×óµ½ÓÒÒÀ´Î»æÖÆ×Ö·û´®ÖĞµÄÃ¿¸ö×Ö·û*/
+static void Ui_DrawText(uint16_t x, uint16_t y, const char *text, uint8_t scale, uint16_t color)
+{
+    uint16_t cursor_x;
+
+    cursor_x = x;
+    while (*text != '\0')
+    {
+        Ui_DrawChar(cursor_x, y, *text, scale, color);
+        cursor_x = (uint16_t)(cursor_x + (uint16_t)(6U * scale));
+        text++;
+    }
+}
+
+//»¨Ô°
+static void Ui_FillCircle(uint16_t cx, uint16_t cy, uint16_t radius, uint16_t color)
+{
+    int16_t dy;
+    int16_t dx;
+    int32_t r2;
+
+    r2 = (int32_t)radius * (int32_t)radius;
+    for (dy = -(int16_t)radius; dy <= (int16_t)radius; dy++)
+    {
+        dx = (int16_t)radius;
+        while ((((int32_t)dx * dx) + ((int32_t)dy * dy)) > r2)
+        {
+            dx--;
+        }
+        (void)ILI9488_FillRect(&g_lcd,
+                               (uint16_t)((int16_t)cx - dx),
+                               (uint16_t)((int16_t)cy + dy),
+                               (uint16_t)((dx * 2) + 1),
+                               1U,
+                               color);
+    }
+}
+
+//ÈıÏñËØ¿íµÄÔ²È¦
+static void Ui_DrawCircleBorder(uint16_t cx, uint16_t cy, uint16_t radius, uint16_t color)
+{
+    Ui_FillCircle(cx, cy, radius, color);
+    Ui_FillCircle(cx, cy, (uint16_t)(radius - 3U), UI_COLOR_BG);
+}
+
+static void Ui_DrawLine(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t color)
+{
+    int16_t dx;
+    int16_t dy;
+    int16_t sx;
+    int16_t sy;
+    int16_t err;
+    int16_t e2;
+    int16_t x;
+    int16_t y;
+
+    x = (int16_t)x0;
+    y = (int16_t)y0;
+    dx = (x0 > x1) ? (int16_t)(x0 - x1) : (int16_t)(x1 - x0);
+    dy = (y0 > y1) ? -(int16_t)(y0 - y1) : -(int16_t)(y1 - y0);
+    sx = (x0 < x1) ? 1 : -1;
+    sy = (y0 < y1) ? 1 : -1;
+    err = (int16_t)(dx + dy);
+
+    for (;;)
+    {
+        (void)ILI9488_DrawPixel(&g_lcd, (uint16_t)x, (uint16_t)y, color);
+        if ((x == (int16_t)x1) && (y == (int16_t)y1))
+        {
+            break;
+        }
+        e2 = (int16_t)(2 * err);
+        if (e2 >= dy)
+        {
+            err = (int16_t)(err + dy);
+            x = (int16_t)(x + sx);
+        }
+        if (e2 <= dx)
+        {
+            err = (int16_t)(err + dx);
+            y = (int16_t)(y + sy);
+        }
+    }
+}
+
+static float Ui_NormalizeHeading(float heading_rad)
+{
+    while (heading_rad > UI_PI)
+    {
+        heading_rad -= (2.0f * UI_PI);
+    }
+    while (heading_rad < -UI_PI)
+    {
+        heading_rad += (2.0f * UI_PI);
+    }
+
+    return heading_rad;
+}
+
+static void Ui_RotatePoint(int16_t local_x,
+                           int16_t local_y,
+                           float heading_rad,
+                           uint16_t cx,
+                           uint16_t cy,
+                           uint16_t *screen_x,
+                           uint16_t *screen_y)
+{
+    float cos_h;
+    float sin_h;
+
+    cos_h = cosf(heading_rad);
+    sin_h = sinf(heading_rad);
+    *screen_x = (uint16_t)((int16_t)cx + (int16_t)(((float)local_x * cos_h) - ((float)local_y * sin_h)));
+    *screen_y = (uint16_t)((int16_t)cy + (int16_t)(((float)local_x * sin_h) + ((float)local_y * cos_h)));
+}
+
+static void Ui_DrawThickLine(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t color)
+{
+    Ui_DrawLine(x0, y0, x1, y1, color);
+    Ui_DrawLine((uint16_t)(x0 + 1U), y0, (uint16_t)(x1 + 1U), y1, color);
+    Ui_DrawLine((uint16_t)(x0 - 1U), y0, (uint16_t)(x1 - 1U), y1, color);
+    Ui_DrawLine(x0, (uint16_t)(y0 + 1U), x1, (uint16_t)(y1 + 1U), color);
+    Ui_DrawLine(x0, (uint16_t)(y0 - 1U), x1, (uint16_t)(y1 - 1U), color);
+}
+
+static void Ui_SwapI32(int32_t *a, int32_t *b)
+{
+    int32_t tmp;
+
+    tmp = *a;
+    *a = *b;
+    *b = tmp;
+}
+
+static void Ui_FillTriangle(uint16_t x0,
+                            uint16_t y0,
+                            uint16_t x1,
+                            uint16_t y1,
+                            uint16_t x2,
+                            uint16_t y2,
+                            uint16_t color)
+{
+    int32_t ax = x0;
+    int32_t ay = y0;
+    int32_t bx = x1;
+    int32_t by = y1;
+    int32_t cx = x2;
+    int32_t cy = y2;
+    int32_t y;
+
+    if (ay > by)
+    {
+        Ui_SwapI32(&ay, &by);
+        Ui_SwapI32(&ax, &bx);
+    }
+    if (by > cy)
+    {
+        Ui_SwapI32(&by, &cy);
+        Ui_SwapI32(&bx, &cx);
+    }
+    if (ay > by)
+    {
+        Ui_SwapI32(&ay, &by);
+        Ui_SwapI32(&ax, &bx);
+    }
+
+    for (y = ay; y <= cy; y++)
+    {
+        int32_t left;
+        int32_t right;
+
+        if ((cy - ay) == 0)
+        {
+            left = ax;
+        }
+        else
+        {
+            left = ax + ((cx - ax) * (y - ay)) / (cy - ay);
+        }
+
+        if (y < by)
+        {
+            right = ((by - ay) == 0) ? bx : ax + ((bx - ax) * (y - ay)) / (by - ay);
+        }
+        else
+        {
+            right = ((cy - by) == 0) ? cx : bx + ((cx - bx) * (y - by)) / (cy - by);
+        }
+
+        if (left > right)
+        {
+            Ui_SwapI32(&left, &right);
+        }
+
+        (void)ILI9488_FillRect(&g_lcd,
+                               (uint16_t)left,
+                               (uint16_t)y,
+                               (uint16_t)(right - left + 1),
+                               1U,
+                               color);
+    }
+}
+
+/* Ö½·É»ú·½Ïò£º0 ±íÊ¾ÆÁÄ»ÕıÉÏ·½£¬ÕıÖµË³Ê±ÕëĞı×ª¡£ */
+static void Ui_DrawPaperPlane(uint16_t cx, uint16_t cy, uint16_t size, float heading_rad, uint16_t color)
+{
+    uint16_t tip_x;
+    uint16_t tip_y;
+    uint16_t left_x;
+    uint16_t left_y;
+    uint16_t tail_x;
+    uint16_t tail_y;
+    uint16_t right_x;
+    uint16_t right_y;
+    uint16_t fold_x;
+    uint16_t fold_y;
+    int16_t half_w;
+    int16_t lower_y;
+    int16_t tail_y_local;
+
+    heading_rad = Ui_NormalizeHeading(heading_rad);
+    half_w = (int16_t)((size * 58U) / 100U);
+    lower_y = (int16_t)((size * 42U) / 100U);
+    tail_y_local = (int16_t)((size * 18U) / 100U);
+
+    Ui_RotatePoint(0, (int16_t)(-(int16_t)size), heading_rad, cx, cy, &tip_x, &tip_y);
+    Ui_RotatePoint((int16_t)(-half_w), lower_y, heading_rad, cx, cy, &left_x, &left_y);
+    Ui_RotatePoint(0, tail_y_local, heading_rad, cx, cy, &tail_x, &tail_y);
+    Ui_RotatePoint(half_w, lower_y, heading_rad, cx, cy, &right_x, &right_y);
+    Ui_RotatePoint((int16_t)(-(int16_t)(size / 6U)), (int16_t)(size / 10U), heading_rad, cx, cy, &fold_x, &fold_y);
+
+    /* ÏÈÌî³äÁ½²à»úÒí£¬ÔÙ²¹ÂÖÀª£¬±ÜÃâÖ»ÏÔÊ¾Ïß¿ò¡£ */
+    Ui_FillTriangle(tip_x, tip_y, left_x, left_y, tail_x, tail_y, color);
+    Ui_FillTriangle(tip_x, tip_y, tail_x, tail_y, right_x, right_y, color);
+
+    Ui_DrawThickLine(tip_x, tip_y, left_x, left_y, color);
+    Ui_DrawThickLine(left_x, left_y, tail_x, tail_y, color);
+    Ui_DrawThickLine(tail_x, tail_y, right_x, right_y, color);
+    Ui_DrawThickLine(right_x, right_y, tip_x, tip_y, color);
+    Ui_DrawThickLine(tip_x, tip_y, tail_x, tail_y, color);
+    Ui_DrawThickLine(tip_x, tip_y, fold_x, fold_y, color);
+}
+
+static void Ui_DrawButtonArrow(uint16_t cx, uint16_t cy, uint16_t color)
+{
+    Ui_DrawPaperPlane(cx, cy, 30U, 0.0f, color);
+}
+
+static const uint16_t *Ui_GetStatusIconData(uint8_t icon)
+{
+    switch (icon)
+    {
+        case 0U: return g_iconNgasData;
+        case 1U: return g_iconLpgData;
+        case 2U: return g_iconHrData;
+        case 3U: return g_iconSpo2Data;
+        default: return NULL;
+    }
+}
+
+static void Ui_DrawStatusBitmap(uint16_t x, uint16_t y, const uint16_t *data)
+{
+    uint16_t row;
+
+    if (data == NULL)
+    {
+        return;
+    }
+
+    for (row = 0U; row < UI_STATUS_ICON_SIZE; row++)
+    {
+        uint16_t col = 0U;
+
+        while (col < UI_STATUS_ICON_SIZE)
+        {
+            uint16_t start;
+
+            while ((col < UI_STATUS_ICON_SIZE) &&
+                   (data[(row * UI_STATUS_ICON_SIZE) + col] == 0x0000U))
+            {
+                col++;
+            }
+
+            start = col;
+            while ((col < UI_STATUS_ICON_SIZE) &&
+                   (data[(row * UI_STATUS_ICON_SIZE) + col] != 0x0000U))
+            {
+                col++;
+            }
+
+            if (col > start)
+            {
+                (void)ILI9488_DrawRGB565Image(&g_lcd,
+                                               (uint16_t)(x + start),
+                                               (uint16_t)(y + row),
+                                               (uint16_t)(col - start),
+                                               1U,
+                                               &data[(row * UI_STATUS_ICON_SIZE) + start]);
+            }
+        }
+    }
+}
+
+static void Ui_DrawStatusIcon(uint16_t x, uint16_t y, uint8_t icon, uint16_t color)
+{
+    (void)color;
+    Ui_DrawStatusBitmap(x, y, Ui_GetStatusIconData(icon));
+}
+
+/*½«ÊıÖµºÍµ¥Î»Æ´½Ó³É×Ö·û´®ºóÒÔ 2 ±¶´óĞ¡»æÖÆ*/
+static void Ui_DrawValueLine(uint16_t x, uint16_t y, uint32_t value, const char *unit, uint16_t color)
+{
+    char text[24];
+
+    (void)snprintf(text, sizeof(text), "%lu%s", (unsigned long)value, unit);
+    Ui_DrawText(x, y, text, 2U, color);
+}
+
+/*»æÖÆ×´Ì¬¿¨Æ¬*/
+/*
+©°©¤©¤©¤©¤©¤©¤©¤©¤©¤©Ğ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©´
+©¦  color  ©¦  [icon]  LABEL               ©¦ y+10
+©¦ 5pxÉ«Ìõ ©¦         XXXXunit             ©¦ y+36
+©¦         ©¦                              ©¦
+©¦         ©¦  ¨€¨€¨€¨€¨€¨€¨€¨€??????????????????  ©¦ y+62 (5px¸ß½ø¶ÈÌõ)
+©¸©¤©¤©¤©¤©¤©¤©¤©¤©¤©Ø©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¼
+ ¡û8px¡ú   ¡û12px¡ú¡û©¤©¤©¤©¤ 246px ©¤©¤©¤©¤¡ú
+
+
+*/
+static void Ui_DrawStatusCardStatic(uint16_t y, const char *label, uint8_t icon, uint16_t color)
+{
+    (void)ILI9488_FillRect(&g_lcd, UI_LEFT_X, y, UI_LEFT_W, UI_CARD_H, UI_COLOR_PANEL);
+    (void)ILI9488_FillRect(&g_lcd, UI_LEFT_X, y, 5U, UI_CARD_H, color);
+    Ui_DrawStatusIcon((uint16_t)(UI_LEFT_X + 12U), (uint16_t)(y + 10U), icon, color);
+    Ui_DrawText((uint16_t)(UI_LEFT_X + 70U), (uint16_t)(y + 10U), label, 2U, UI_COLOR_TEXT);
+    (void)ILI9488_FillRect(&g_lcd, (uint16_t)(UI_LEFT_X + 12U), (uint16_t)(y + 62U), (uint16_t)(UI_LEFT_W - 24U), 5U, UI_COLOR_PANEL_2);
+}
+
+static void Ui_UpdateStatusCardValue(uint8_t index,
+                                     uint16_t y,
+                                     uint32_t value,
+                                     const char *unit,
+                                     uint32_t max_value,
+                                     uint16_t color,
+                                     uint8_t force)
+{
+    uint16_t bar_w;
+
+    bar_w = Ui_BarWidthU32(value, max_value, (uint16_t)(UI_LEFT_W - 24U));
+
+    if ((force != 0U) ||
+        (s_mainValueValid == 0U) ||
+        (s_lastStatusValue[index] != value))
+    {
+        (void)ILI9488_FillRect(&g_lcd,
+                               (uint16_t)(UI_LEFT_X + UI_STATUS_VALUE_X_OFF),
+                               (uint16_t)(y + UI_STATUS_VALUE_Y_OFF),
+                               UI_STATUS_VALUE_W,
+                               UI_STATUS_VALUE_H,
+                               UI_COLOR_PANEL);
+        Ui_DrawValueLine((uint16_t)(UI_LEFT_X + UI_STATUS_VALUE_X_OFF),
+                         (uint16_t)(y + UI_STATUS_VALUE_Y_OFF),
+                         value,
+                         unit,
+                         color);
+        s_lastStatusValue[index] = value;
+    }
+
+    if ((force != 0U) ||
+        (s_mainValueValid == 0U) ||
+        (s_lastStatusBarW[index] != bar_w))
+    {
+        (void)ILI9488_FillRect(&g_lcd,
+                               (uint16_t)(UI_LEFT_X + 12U),
+                               (uint16_t)(y + 62U),
+                               (uint16_t)(UI_LEFT_W - 24U),
+                               5U,
+                               UI_COLOR_PANEL_2);
+        (void)ILI9488_FillRect(&g_lcd,
+                               (uint16_t)(UI_LEFT_X + 12U),
+                               (uint16_t)(y + 62U),
+                               bar_w,
+                               5U,
+                               color);
+        s_lastStatusBarW[index] = bar_w;
+    }
+}
+
+static void Ui_DrawQuickCircleStatic(void)
+{
+    Ui_FillCircle(UI_QUICK_CX, UI_QUICK_CY, UI_QUICK_R, UI_COLOR_PANEL);
+    Ui_DrawCircleBorder(UI_QUICK_CX, UI_QUICK_CY, UI_QUICK_R, UI_COLOR_ACTION);
+    Ui_DrawText((uint16_t)((int16_t)UI_QUICK_CX + UI_BASE_TEXT_X_OFF),
+                (uint16_t)((int16_t)UI_QUICK_CY + UI_BASE_TEXT_Y_OFF),
+                UI_BASE_TEXT,
+                2U,
+                UI_COLOR_TEXT);
+}
+
+static void Ui_UpdateQuickCircleValue(const AppSnapshot_t *snapshot, uint8_t force)
+{
+    char text[24];
+    uint32_t distance_m;
+    uint8_t signal;
+
+    distance_m = Ui_BaseDistanceMeter(snapshot);
+    signal = Ui_SignalPercent(snapshot);
+
+    if ((force != 0U) ||
+        (s_mainValueValid == 0U) ||
+        (s_lastBaseDistanceM != distance_m))
+    {
+        (void)ILI9488_FillRect(&g_lcd,
+                               (uint16_t)(UI_QUICK_CX - 46U),
+                               (uint16_t)(UI_QUICK_CY - 8U),
+                               96U,
+                               22U,
+                               UI_COLOR_PANEL);
+        (void)snprintf(text, sizeof(text), "%luM", (unsigned long)distance_m);
+        Ui_DrawText((uint16_t)((int16_t)UI_QUICK_CX + UI_BASE_DIST_X_OFF),
+                    (uint16_t)((int16_t)UI_QUICK_CY + UI_BASE_DIST_Y_OFF),
+                    text,
+                    2U,
+                    UI_COLOR_ACTION);
+        s_lastBaseDistanceM = distance_m;
+    }
+
+    if ((force != 0U) ||
+        (s_mainValueValid == 0U) ||
+        (s_lastBaseSignal != signal))
+    {
+        (void)ILI9488_FillRect(&g_lcd,
+                               (uint16_t)(UI_QUICK_CX - 44U),
+                               (uint16_t)(UI_QUICK_CY + 22U),
+                               72U,
+                               10U,
+                               UI_COLOR_PANEL);
+        (void)snprintf(text, sizeof(text), "SIG:%u%%", signal);
+        Ui_DrawText((uint16_t)((int16_t)UI_QUICK_CX + UI_BASE_SIG_X_OFF),
+                    (uint16_t)((int16_t)UI_QUICK_CY + UI_BASE_SIG_Y_OFF),
+                    text,
+                    1U,
+                    UI_COLOR_MUTED);
+        s_lastBaseSignal = signal;
+    }
+}
+
+static void Ui_DrawBackCircle(void)
+{
+    Ui_FillCircle(UI_QUICK_CX, UI_QUICK_CY, UI_QUICK_R, UI_COLOR_PANEL);
+    Ui_DrawCircleBorder(UI_QUICK_CX, UI_QUICK_CY, UI_QUICK_R, UI_COLOR_ACTION);
+    Ui_DrawText((uint16_t)(UI_QUICK_CX - 30U), (uint16_t)(UI_QUICK_CY - 16U), "BACK", 2U, UI_COLOR_TEXT);
+    Ui_DrawText((uint16_t)(UI_QUICK_CX - 20U), (uint16_t)(UI_QUICK_CY + 18U), "TAP", 1U, UI_COLOR_MUTED);
+}
+
+static void Ui_DrawReturnButton(void)
+{
+    (void)ILI9488_FillRect(&g_lcd, UI_RIGHT_X, UI_HOME_BTN_Y, UI_RIGHT_W, UI_HOME_BTN_H, UI_COLOR_ACTION);
+    Ui_DrawText((uint16_t)(UI_RIGHT_X + UI_HOME_TEXT_X_OFF),
+                (uint16_t)(UI_HOME_BTN_Y + UI_HOME_TEXT_Y_OFF),
+                "HOME",
+                3U,
+                UI_COLOR_TEXT);
+    Ui_DrawButtonArrow((uint16_t)(UI_RIGHT_X + UI_HOME_ICON_X_OFF),
+                       (uint16_t)(UI_HOME_BTN_Y + UI_HOME_ICON_Y_OFF),
+                       UI_COLOR_TEXT);
+}
+
+static void Ui_DrawMainView(const AppSnapshot_t *snapshot, uint8_t full_redraw)
+{
+    uint16_t y;
+    uint8_t force_update;
+    uint32_t value[4];
+
+    value[0] = Ui_FloatToU32(snapshot->adc.gas_concentration[0]);
+    value[1] = Ui_FloatToU32(snapshot->adc.gas_concentration[1]);
+    value[2] = snapshot->spo2.heart_rate_bpm;
+    value[3] = snapshot->spo2.spo2_percent;
+    force_update = ((full_redraw != 0U) || (s_mainValueValid == 0U)) ? 1U : 0U;
+
+    if (full_redraw != 0U)
+    {
+        y = 10U;
+        Ui_DrawStatusCardStatic(y, "NGAS", 0U, UI_COLOR_NGAS);
+        y = (uint16_t)(y + UI_CARD_H + UI_CARD_GAP);
+        Ui_DrawStatusCardStatic(y, "LPG", 1U, UI_COLOR_LPG);
+        y = (uint16_t)(y + UI_CARD_H + UI_CARD_GAP);
+        Ui_DrawStatusCardStatic(y, "HR", 2U, UI_COLOR_HR);
+        y = (uint16_t)(y + UI_CARD_H + UI_CARD_GAP);
+        Ui_DrawStatusCardStatic(y, "SPO2", 3U, UI_COLOR_SPO2);
+
+        (void)ILI9488_FillRect(&g_lcd, UI_RIGHT_X, 8U, UI_RIGHT_W, 312U, UI_COLOR_BG);
+        Ui_DrawQuickCircleStatic();
+        Ui_DrawReturnButton();
+    }
+
+    y = 10U;
+    Ui_UpdateStatusCardValue(0U, y, value[0], "PPM", UI_GAS_BAR_MAX_PPM, UI_COLOR_NGAS, force_update);
+    y = (uint16_t)(y + UI_CARD_H + UI_CARD_GAP);
+    Ui_UpdateStatusCardValue(1U, y, value[1], "PPM", UI_GAS_BAR_MAX_PPM, UI_COLOR_LPG, force_update);
+    y = (uint16_t)(y + UI_CARD_H + UI_CARD_GAP);
+    Ui_UpdateStatusCardValue(2U, y, value[2], "BPM", 200U, UI_COLOR_HR, force_update);
+    y = (uint16_t)(y + UI_CARD_H + UI_CARD_GAP);
+    Ui_UpdateStatusCardValue(3U, y, value[3], "%", 100U, UI_COLOR_SPO2, force_update);
+    Ui_UpdateQuickCircleValue(snapshot, force_update);
+    s_mainValueValid = 1U;
+}
+
+static void Ui_DrawQuickButton(uint16_t y, const char *label)
+{
+    (void)ILI9488_FillRect(&g_lcd, 28U, y, 232U, 54U, UI_COLOR_PANEL);
+    Ui_DrawText(58U, (uint16_t)(y + 18U), label, 2U, UI_COLOR_TEXT);
+}
+
+static void Ui_DrawQuickView(void)
+{
+    Ui_DrawText(30U, 24U, "QUICK CMD", 2U, UI_COLOR_TEXT);
+    Ui_DrawQuickButton(70U, "SEND 1");
+    Ui_DrawQuickButton(136U, "SEND 2");
+    Ui_DrawQuickButton(202U, "SEND 3");
+    Ui_DrawBackCircle();
+}
+
+static void Ui_DrawReturnView(const AppSnapshot_t *snapshot)
+{
+    char text[24];
+    UiReturnGuidance_t guidance;
+
+    memset(&guidance, 0, sizeof(guidance));
+    guidance.distance_m = Ui_BaseDistanceMeter(snapshot);
+    if (App_UiGetReturnGuidance(snapshot, &guidance) != 0)
+    {
+        guidance.valid = 0U;
+        guidance.heading_rad = 0.0f;
+        guidance.distance_m = Ui_BaseDistanceMeter(snapshot);
+    }
+    if (guidance.valid == 0U)
+    {
+        guidance.heading_rad = 0.0f;
+    }
+
+    (void)ILI9488_FillRect(&g_lcd, 120U, 24U, 240U, 180U, ILI9488_COLOR_BLACK);
+    Ui_DrawPaperPlane(240U, 122U, 78U, guidance.heading_rad, ILI9488_COLOR_WHITE);
+    (void)ILI9488_FillRect(&g_lcd, 150U, 222U, 210U, 48U, ILI9488_COLOR_BLACK);
+    (void)snprintf(text, sizeof(text), "%luM", (unsigned long)guidance.distance_m);
+    Ui_DrawText(190U, 230U, text, 3U, ILI9488_COLOR_WHITE);
+    Ui_DrawText(170U, 288U, "TAP TO EXIT", 2U, UI_COLOR_MUTED);
+}
+
+static uint8_t Ui_PointInRect(uint16_t x, uint16_t y, uint16_t rx, uint16_t ry, uint16_t rw, uint16_t rh)
+{
+    return ((x >= rx) && (x < (uint16_t)(rx + rw)) && (y >= ry) && (y < (uint16_t)(ry + rh))) ? 1U : 0U;
+}
+
+static uint8_t Ui_PointInQuickCircle(uint16_t x, uint16_t y)
+{
+    int32_t dx;
+    int32_t dy;
+
+    dx = (int32_t)x - (int32_t)UI_QUICK_CX;
+    dy = (int32_t)y - (int32_t)UI_QUICK_CY;
+    return (((dx * dx) + (dy * dy)) <= ((int32_t)UI_QUICK_R * (int32_t)UI_QUICK_R)) ? 1U : 0U;
+}
+
+static UiTouchAction_t Ui_HandleTouch(uint16_t x, uint16_t y, AppCommandMsg_t *command)
+{
+    memset(command, 0, sizeof(*command));
+
+    if (s_view == UI_VIEW_MAIN)
+    {
+        if (Ui_PointInQuickCircle(x, y) != 0U)
+        {
+            s_view = UI_VIEW_QUICK;
+            return UI_TOUCH_QUICK;
+        }
+        if (Ui_PointInRect(x, y, UI_RIGHT_X, UI_HOME_BTN_Y, UI_RIGHT_W, UI_HOME_BTN_H) != 0U)
+        {
+            s_view = UI_VIEW_RETURN;
+            command->id = APP_CMD_RETURN_HOME_START;
+            return UI_TOUCH_RETURN_START;
+        }
+    }
+    else if (s_view == UI_VIEW_QUICK)
+    {
+        if (Ui_PointInQuickCircle(x, y) != 0U)
+        {
+            s_view = UI_VIEW_MAIN;
+            return UI_TOUCH_QUICK_BACK;
+        }
+        if (Ui_PointInRect(x, y, 28U, 70U, 232U, 54U) != 0U)
+        {
+            command->id = APP_CMD_LORA_SEND;
+            command->param0 = 1U;
+            return UI_TOUCH_QUICK_SEND;
+        }
+        if (Ui_PointInRect(x, y, 28U, 136U, 232U, 54U) != 0U)
+        {
+            command->id = APP_CMD_LORA_SEND;
+            command->param0 = 2U;
+            return UI_TOUCH_QUICK_SEND;
+        }
+        if (Ui_PointInRect(x, y, 28U, 202U, 232U, 54U) != 0U)
+        {
+            command->id = APP_CMD_LORA_SEND;
+            command->param0 = 3U;
+            return UI_TOUCH_QUICK_SEND;
+        }
+    }
+    else
+    {
+        s_view = UI_VIEW_MAIN;
+        command->id = APP_CMD_RETURN_HOME_STOP;
+        return UI_TOUCH_RETURN_STOP;
+    }
+
+    return UI_TOUCH_NONE;
 }
 
 int32_t App_UiHardwareInit(void)
@@ -51,115 +925,52 @@ int32_t App_UiHardwareInit(void)
         return -1;
     }
 
-    (void)ILI9488_Fill(&g_lcd, ILI9488_COLOR_BLACK);
+    (void)ILI9488_Fill(&g_lcd, UI_COLOR_BG);
     return 0;
 }
 
 void App_UiRender(const AppSnapshot_t *snapshot)
 {
-    uint16_t width;
-    uint16_t bar_width;
-    uint16_t y;
+    uint8_t full_redraw;
 
     if (snapshot == NULL)
     {
         return;
     }
 
-    width = g_lcd.width;
-    if (width < 40U)
+    full_redraw = 0U;
+    if (s_lastRenderedView != s_view)
     {
-        return;
+        s_lastRenderedView = s_view;
+        full_redraw = 1U;
+        if (s_view == UI_VIEW_MAIN)
+        {
+            s_mainValueValid = 0U;
+        }
+        (void)ILI9488_Fill(&g_lcd, (s_view == UI_VIEW_RETURN) ? ILI9488_COLOR_BLACK : UI_COLOR_BG);
     }
 
-    if (s_uiFirstRender != 0U)
+    if (s_view == UI_VIEW_MAIN)
     {
-        (void)ILI9488_Fill(&g_lcd, ILI9488_COLOR_BLACK);
-        s_uiFirstRender = 0U;
+        Ui_DrawMainView(snapshot, full_redraw);
     }
-
-    /* é¡¶éƒ¨çŠ¶æ€æ¡ï¼šç»¿è‰²è¡¨ç¤ºåˆå§‹åŒ–å®Œæˆä¸”æ— åˆå§‹åŒ–é”™è¯¯ï¼Œçº¢è‰²è¡¨ç¤ºåˆå§‹åŒ–å¤±è´¥ã€‚ */
-    (void)ILI9488_FillRect(&g_lcd,
-                           0U,
-                           0U,
-                           width,
-                           18U,
-                           (snapshot->system.init_result == 0) ? ILI9488_COLOR_GREEN : ILI9488_COLOR_RED);
-
-    bar_width = (uint16_t)(width - 24U);
-    y = 34U;
-
-    /* ADC0 / ADC1 ç”µå‹æ¡ã€‚ */
-    (void)ILI9488_FillRect(&g_lcd, 12U, y, bar_width, 14U, ILI9488_COLOR_BLUE);
-    (void)ILI9488_FillRect(&g_lcd,
-                           12U,
-                           y,
-                           Ui_BarWidthU32(snapshot->adc.voltage_mv[0], APP_ADC_VREF_MV, bar_width),
-                           14U,
-                           ILI9488_COLOR_CYAN);
-
-    y = (uint16_t)(y + 24U);
-    (void)ILI9488_FillRect(&g_lcd, 12U, y, bar_width, 14U, ILI9488_COLOR_BLUE);
-    (void)ILI9488_FillRect(&g_lcd,
-                           12U,
-                           y,
-                           Ui_BarWidthU32(snapshot->adc.voltage_mv[1], APP_ADC_VREF_MV, bar_width),
-                           14U,
-                           ILI9488_COLOR_YELLOW);
-
-    y = (uint16_t)(y + 24U);
-    (void)ILI9488_FillRect(&g_lcd, 12U, y, bar_width, 14U, ILI9488_COLOR_BLUE);
-    (void)ILI9488_FillRect(&g_lcd,
-                           12U,
-                           y,
-                           Ui_BarWidthFloat(snapshot->adc.gas_concentration[0], 1000.0f, bar_width),
-                           14U,
-                           ILI9488_COLOR_GREEN);
-
-    y = (uint16_t)(y + 24U);
-    (void)ILI9488_FillRect(&g_lcd, 12U, y, bar_width, 14U, ILI9488_COLOR_BLUE);
-    (void)ILI9488_FillRect(&g_lcd,
-                           12U,
-                           y,
-                           Ui_BarWidthFloat(snapshot->adc.gas_concentration[1], 1000.0f, bar_width),
-                           14U,
-                           ILI9488_COLOR_MAGENTA);
-
-    y = (uint16_t)(y + 32U);
-    (void)ILI9488_FillRect(&g_lcd, 12U, y, bar_width, 12U, ILI9488_COLOR_BLUE);
-    (void)ILI9488_FillRect(&g_lcd,
-                           12U,
-                           y,
-                           Ui_BarWidthU32(snapshot->spo2.spo2_percent, 100U, bar_width),
-                           12U,
-                           ILI9488_COLOR_RED);
-
-    /* åº•éƒ¨è‰²å—ï¼šLoRaã€è¿”èˆªã€è§¦æ‘¸çŠ¶æ€ã€‚ */
-    y = (uint16_t)(g_lcd.height - 28U);
-    (void)ILI9488_FillRect(&g_lcd, 0U, y, width, 28U, ILI9488_COLOR_BLACK);
-    (void)ILI9488_FillRect(&g_lcd,
-                           6U,
-                           (uint16_t)(y + 6U),
-                           42U,
-                           16U,
-                           (snapshot->lora.error_count == 0U) ? ILI9488_COLOR_GREEN : ILI9488_COLOR_RED);
-    (void)ILI9488_FillRect(&g_lcd,
-                           58U,
-                           (uint16_t)(y + 6U),
-                           42U,
-                           16U,
-                           (snapshot->return_home.mode == RETURN_MODE_IDLE) ? ILI9488_COLOR_BLUE : ILI9488_COLOR_YELLOW);
-    (void)ILI9488_FillRect(&g_lcd,
-                           110U,
-                           (uint16_t)(y + 6U),
-                           42U,
-                           16U,
-                           (snapshot->ui.touch_count == 0U) ? ILI9488_COLOR_BLUE : ILI9488_COLOR_CYAN);
+    else if (s_view == UI_VIEW_QUICK)
+    {
+        if (full_redraw != 0U)
+        {
+            Ui_DrawQuickView();
+        }
+    }
+    else
+    {
+        Ui_DrawReturnView(snapshot);
+    }
 }
 
 int32_t App_UiPollTouch(AppCommandMsg_t *command)
 {
     XPT2046_Point point;
+    UiTouchAction_t action;
 
     if (command == NULL)
     {
@@ -174,11 +985,14 @@ int32_t App_UiPollTouch(AppCommandMsg_t *command)
         }
 
         s_touchPressed = 1U;
-        memset(command, 0, sizeof(*command));
-        command->id = APP_CMD_USER_BASE;
-        command->param0 = point.x;
-        command->param1 = point.y;
-        return 1;
+        action = Ui_HandleTouch(point.x, point.y, command);
+        if ((action == UI_TOUCH_RETURN_START) ||
+            (action == UI_TOUCH_RETURN_STOP) ||
+            (action == UI_TOUCH_QUICK_SEND))
+        {
+            return 1;
+        }
+        return 0;
     }
 
     s_touchPressed = 0U;
@@ -240,3 +1054,4 @@ void Task_UiEntry(void *argument)
         osDelayUntil(next_tick);
     }
 }
+

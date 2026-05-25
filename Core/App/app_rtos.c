@@ -16,12 +16,13 @@
 #include "task_ins_pdr.h"
 
 /*
- * RTOS å¯¹è±¡åœ¨è¿™é‡Œé›†ä¸­åˆ›å»ºï¼š
- * ä»»åŠ¡æ–‡ä»¶åªä½¿ç”¨ extern å¥æŸ„ï¼Œä¸è´Ÿè´£åˆ›å»ºé˜Ÿåˆ—/äº’æ–¥é”/äº‹ä»¶ç»„ã€‚
+ * RTOS ¶ÔÏóÔÚÕâÀï¼¯ÖĞ´´½¨£º
+ * ÈÎÎñÎÄ¼şÖ»Ê¹ÓÃ extern ¾ä±ú£¬²»¸ºÔğ´´½¨¶ÓÁĞ/»¥³âËø/ÊÂ¼ş×é¡£
  */
 osEventFlagsId_t g_sysEventFlags = NULL;
 osMessageQueueId_t g_gyroRxQueue = NULL;
 osMessageQueueId_t g_uiCmdQueue = NULL;
+osMessageQueueId_t g_navDeltaQueue = NULL;
 osMessageQueueId_t g_loraTxQueue = NULL;
 osMessageQueueId_t g_loraRxQueue = NULL;
 osMessageQueueId_t g_returnCmdQueue = NULL;
@@ -74,6 +75,7 @@ void App_RtosCreateObjects(void)
     g_sysEventFlags = osEventFlagsNew(NULL);
     g_gyroRxQueue = osMessageQueueNew(APP_GYRO_QUEUE_DEPTH, sizeof(GyroRxMsg_t), NULL);
     g_uiCmdQueue = osMessageQueueNew(APP_UI_CMD_QUEUE_DEPTH, sizeof(AppCommandMsg_t), NULL);
+    g_navDeltaQueue = osMessageQueueNew(APP_NAV_DELTA_QUEUE_DEPTH, sizeof(NavDeltaMsg_t), NULL);
     g_loraTxQueue = osMessageQueueNew(APP_LORA_QUEUE_DEPTH, sizeof(LoraPacketMsg_t), NULL);
     g_loraRxQueue = osMessageQueueNew(APP_LORA_QUEUE_DEPTH, sizeof(LoraPacketMsg_t), NULL);
     g_returnCmdQueue = osMessageQueueNew(APP_RETURN_QUEUE_DEPTH, sizeof(ReturnCommandMsg_t), NULL);
@@ -88,6 +90,7 @@ void App_RtosCreateObjects(void)
     if ((g_sysEventFlags == NULL) ||
         (g_gyroRxQueue == NULL) ||
         (g_uiCmdQueue == NULL) ||
+        (g_navDeltaQueue == NULL) ||
         (g_loraTxQueue == NULL) ||
         (g_loraRxQueue == NULL) ||
         (g_returnCmdQueue == NULL) ||
@@ -121,7 +124,7 @@ static void InitTask(void *argument)
 
     (void)argument;
 
-    init_result = App_InitPeripherals(&done_mask);   //å¤–è®¾åˆå§‹åŒ–
+    init_result = App_InitPeripherals(&done_mask);   //ÍâÉè³õÊ¼»¯
     App_StateSetInitResult(done_mask, init_result);
 
     if (init_result != 0)
@@ -129,7 +132,7 @@ static void InitTask(void *argument)
         App_Error(0x1100U | ((uint32_t)(-init_result) & 0xFFU));
     }
 
-    if (App_StartRuntimeTasks() != 0)                //ä»»åŠ¡å»ºç«‹
+    if (App_StartRuntimeTasks() != 0)                //ÈÎÎñ½¨Á¢
     {
         App_Error(0x1200U);
     }
@@ -138,9 +141,9 @@ static void InitTask(void *argument)
     App_DebugLog("init mask=0x%08lX", (unsigned long)done_mask);
 
     /*
-     * ä¸åˆ é™¤ InitTaskã€‚åˆ é™¤ä»»åŠ¡ä¼šäº¤ç»™ idle task è°ƒç”¨
-     * prvCheckTasksWaitingTermination() æ¸…ç† TCBï¼Œè°ƒè¯•æ—¶å®¹æ˜“è¯¯åˆ¤ä¸ºå¡æ­»ã€‚
-     * åˆå§‹åŒ–å®ŒæˆåæŒ‚èµ·å³å¯ï¼Œä¸šåŠ¡ä»»åŠ¡å·²ç»å…¨éƒ¨å¯åŠ¨ã€‚
+     * ²»É¾³ı InitTask¡£É¾³ıÈÎÎñ»á½»¸ø idle task µ÷ÓÃ
+     * prvCheckTasksWaitingTermination() ÇåÀí TCB£¬µ÷ÊÔÊ±ÈİÒ×ÎóÅĞÎª¿¨ËÀ¡£
+     * ³õÊ¼»¯Íê³Éºó¹ÒÆğ¼´¿É£¬ÒµÎñÈÎÎñÒÑ¾­È«²¿Æô¶¯¡£
      */
     (void)osThreadSuspend(osThreadGetId());
     for (;;)

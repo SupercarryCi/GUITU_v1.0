@@ -192,14 +192,25 @@ int TFT_Port_Init(void)
     return -1;
   }
 
+  /* Landscape UI: logical LCD size becomes 480 x 320. */
+  if (ILI9488_SetRotation(&g_lcd, ILI9488_ROTATION_90) != 0)
+  {
+    return -1;
+  }
+
   if (XPT2046_Init(&g_touch, &touch_io) != 0)
   {
     return -1;
   }
 
-  g_touch.cal.screen_width = g_lcd.width;
-  g_touch.cal.screen_height = g_lcd.height;
-  g_touch.cal.invert_x = 1U;
+  /*
+   * XPT2046 swaps coordinates after range mapping. For landscape, set the
+   * pre-swap range as 320 x 480 so the final output is 480 x 320.
+   */
+  g_touch.cal.screen_width = g_lcd.height;
+  g_touch.cal.screen_height = g_lcd.width;
+  g_touch.cal.swap_xy = 1U;
+  g_touch.cal.invert_x = 0U;
   g_touch.cal.invert_y = 0U;
 
   return 0;

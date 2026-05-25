@@ -34,13 +34,52 @@ static uint32_t s_adcTxCnt = 0U; /*测试变量*/
 static uint16_t s_adcDmaBuffer[APP_ADC_CHANNEL_COUNT] __attribute__((section(".dma_buffer"), aligned(32))); /* DMA 缓冲区 */
 static volatile uint32_t s_adcDmaErrorCount = 0U;
 
+#define ADC_GAS_PPM_MAX 99999.0f
+
 float compute_gas_concentration(float A, float B, uint16_t V0, uint16_t VAO)
 {
-    float term1 = (3300.0f / VAO) - 1.0f;
-    float term2 = (3300.0f / V0) - 1.0f;
-    float ratio = term1 / term2;
+    float term1;
+    float term2;
+    float ratio;
+    float ppm;
 
-    return A / powf(ratio, B);
+    /*
+     * MQ sensor curve: Rs/R0 = ((Vc/Vout)-1) / ((Vc/V0)-1),
+     * ppm = A / (Rs/R0)^B. Result is an estimated ppm value.
+     */
+    if ((V0 == 0U) || (VAO == 0U) || (V0 >= APP_ADC_VREF_MV))
+    {
+        return 0.0f;
+    }
+    if (VAO >= APP_ADC_VREF_MV)
+    {
+        return ADC_GAS_PPM_MAX;
+    }
+
+    term1 = ((float)APP_ADC_VREF_MV / (float)VAO) - 1.0f;
+    term2 = ((float)APP_ADC_VREF_MV / (float)V0) - 1.0f;
+    if ((term1 <= 0.0f) || (term2 <= 0.0f))
+    {
+        return 0.0f;
+    }
+
+    ratio = term1 / term2;
+    if (ratio <= 0.0f)
+    {
+        return 0.0f;
+    }
+
+    ppm = A / powf(ratio, B);
+    if (ppm > ADC_GAS_PPM_MAX)
+    {
+        return ADC_GAS_PPM_MAX;
+    }
+    if (ppm < 0.0f)
+    {
+        return 0.0f;
+    }
+
+    return ppm;
 }
 
 int32_t Task_AdcInitHardware(void)

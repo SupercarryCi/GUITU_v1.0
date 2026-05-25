@@ -10,6 +10,7 @@ extern "C" {
 extern osEventFlagsId_t g_sysEventFlags;
 extern osMessageQueueId_t g_gyroRxQueue;
 extern osMessageQueueId_t g_uiCmdQueue;
+extern osMessageQueueId_t g_navDeltaQueue;
 extern osMessageQueueId_t g_loraTxQueue;
 extern osMessageQueueId_t g_loraRxQueue;
 extern osMessageQueueId_t g_returnCmdQueue;

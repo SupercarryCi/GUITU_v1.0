@@ -8,8 +8,8 @@
 #include "task_debug.h"
 
 /*
- * ControlTask æ˜¯ UI å‘½ä»¤åˆ†å‘ä¸­å¿ƒã€‚
- * åç»­å¦‚æœå¢åŠ èœå•ã€æ¨¡å¼åˆ‡æ¢ã€LoRa é…ç½®ï¼Œéƒ½ä»è¿™é‡Œè½¬å‘åˆ°å¯¹åº”ä»»åŠ¡ã€‚
+ * ControlTask ÊÇÈ«¾Ö¿ØÖÆÖĞĞÄ¡£
+ * UI ÃüÁîÔÚÕâÀï·Ö·¢£¬INS/PDR Î»ÒÆÔöÁ¿Ò²ÔÚÕâÀïÀÛ¼Æ³ÉÈ«¾ÖÎ»ÖÃ¡£
  */
 static void task_control_dispatch_return(const AppCommandMsg_t *command)
 {
@@ -19,9 +19,76 @@ static void task_control_dispatch_return(const AppCommandMsg_t *command)
     (void)osMessageQueuePut(g_returnCmdQueue, &return_command, 0U, 0U);
 }
 
+static void task_control_apply_nav_delta(const NavDeltaMsg_t *delta)
+{
+    NavState_t nav;
+
+    if (delta == NULL)
+    {
+        return;
+    }
+
+    App_StateGetNav(&nav);
+
+    /*
+     * ºóĞø·µº½Â·¾¶ÓÅ»¯¡¢¹Ø¼üµãĞ£×¼¡¢UWB/LoRa ĞŞÕı£¬¶¼Ó¦ÔÚÕâÀïĞŞÕı nav£¬
+     * ²»ÔÙÈÃ INS/PDR ÈÎÎñÖ±½ÓÀÛ¼ÆÈ«¾ÖÎ»ÖÃ¡£
+     */
+    nav.data.position_m[0] += delta->delta_m[0];
+    nav.data.position_m[1] += delta->delta_m[1];
+    nav.data.position_m[2] += delta->delta_m[2];
+
+    nav.data.velocity_mps[0] = delta->velocity_mps[0];
+    nav.data.velocity_mps[1] = delta->velocity_mps[1];
+    nav.data.velocity_mps[2] = delta->velocity_mps[2];
+
+    nav.data.attitude_rad[0] = delta->attitude_rad[0];
+    nav.data.attitude_rad[1] = delta->attitude_rad[1];
+    nav.data.attitude_rad[2] = delta->attitude_rad[2];
+    nav.data.YAW_deg = delta->yaw_deg;
+    nav.update_count++;
+
+    App_StateSetNav(&nav);
+    (void)osEventFlagsSet(g_sysEventFlags, SYS_EVT_NAV_UPDATED);
+}
+
+static void task_control_dispatch_ui_command(const AppCommandMsg_t *command)
+{
+    if (command == NULL)
+    {
+        return;
+    }
+
+    switch (command->id)
+    {
+        case APP_CMD_RETURN_HOME_START:
+        case APP_CMD_RETURN_HOME_STOP:
+        case APP_CMD_RETURN_HOME_PAUSE:
+        case APP_CMD_RETURN_HOME_RESUME:
+            task_control_dispatch_return(command);
+            break;
+
+        case APP_CMD_LORA_SEND:
+            /* ´ıÄãÍêÉÆ£º×éÖ¯ LoRa ·¢ËÍ°ü²¢Í¶µİµ½ g_loraTxQueue¡£ */
+            App_DebugLog("ui requested lora send");
+            break;
+
+        case APP_CMD_MARK_PATH_POINT:
+            /* ´ıÄãÍêÉÆ£º°Ñµ±Ç° NavState_t ×·¼Óµ½·µº½Â·¾¶´æ´¢¡£ */
+            App_DebugLog("ui marked path point");
+            break;
+
+        default:
+            /* ´ıÄãÍêÉÆ£ºĞÂÔö UI ÃüÁîÊ±ÔÚÕâÀï²¹³ä·Ö·¢Âß¼­¡£ */
+            break;
+    }
+}
+
 void Task_ControlEntry(void *argument)
 {
     AppCommandMsg_t command;
+    NavDeltaMsg_t nav_delta;
+    uint32_t flags;
 
     (void)argument;
 
@@ -32,30 +99,28 @@ void Task_ControlEntry(void *argument)
 
     for (;;)
     {
-        if (osMessageQueueGet(g_uiCmdQueue, &command, NULL, osWaitForever) == osOK)
+        flags = osEventFlagsWait(g_sysEventFlags,
+                                 SYS_EVT_UI_COMMAND | SYS_EVT_NAV_DELTA_READY,
+                                 osFlagsWaitAny,
+                                 osWaitForever);
+        if ((flags & osFlagsError) != 0U)
         {
-            switch (command.id)
+            continue;
+        }
+
+        if ((flags & SYS_EVT_UI_COMMAND) != 0U)
+        {
+            while (osMessageQueueGet(g_uiCmdQueue, &command, NULL, 0U) == osOK)
             {
-                case APP_CMD_RETURN_HOME_START:
-                case APP_CMD_RETURN_HOME_STOP:
-                case APP_CMD_RETURN_HOME_PAUSE:
-                case APP_CMD_RETURN_HOME_RESUME:
-                    task_control_dispatch_return(&command);
-                    break;
+                task_control_dispatch_ui_command(&command);
+            }
+        }
 
-                case APP_CMD_LORA_SEND:
-                    /* å¾…ä½ å®Œå–„ï¼šç»„ç»‡ LoRa å‘é€åŒ…å¹¶æŠ•é€’åˆ° g_loraTxQueueã€‚ */
-                    App_DebugLog("ui requested lora send");
-                    break;
-
-                case APP_CMD_MARK_PATH_POINT:
-                    /* å¾…ä½ å®Œå–„ï¼šæŠŠå½“å‰ NavState_t è¿½åŠ åˆ°è¿”èˆªè·¯å¾„å­˜å‚¨ã€‚ */
-                    App_DebugLog("ui marked path point");
-                    break;
-
-                default:
-                    /* å¾…ä½ å®Œå–„ï¼šæ–°å¢ UI å‘½ä»¤æ—¶åœ¨è¿™é‡Œè¡¥å……åˆ†å‘é€»è¾‘ã€‚ */
-                    break;
+        if ((flags & SYS_EVT_NAV_DELTA_READY) != 0U)
+        {
+            while (osMessageQueueGet(g_navDeltaQueue, &nav_delta, NULL, 0U) == osOK)
+            {
+                task_control_apply_nav_delta(&nav_delta);
             }
         }
     }

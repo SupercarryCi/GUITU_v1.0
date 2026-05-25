@@ -15,18 +15,18 @@ typedef enum
     APP_CMD_MARK_PATH_POINT,
     APP_CMD_LORA_SEND,
     APP_CMD_USER_BASE = 100
-} AppCommandId_t;//éœ€è¦å¤§æ”¹ï¼Œå…ˆæ”¾ç€
+} AppCommandId_t;//ĞèÒª´ó¸Ä£¬ÏÈ·Å×Å
 
 typedef struct
 {
-    /* ä¸€å¸§åŸå§‹é™€èºä»ªæ•°æ® */
+    /* Ò»Ö¡Ô­Ê¼ÍÓÂİÒÇÊı¾İ */
     uint8_t data[APP_GYRO_RX_MAX_LEN];
     uint16_t len;
 } GyroRxMsg_t;
 
 typedef struct
 {
-    /* UI è§¦æ‘¸è¾“å‡ºçš„ç»Ÿä¸€å‘½ä»¤ï¼ŒControlTask è´Ÿè´£åˆ†å‘ç»™å…·ä½“ä»»åŠ¡ */
+    /* UI ´¥ÃşÊä³öµÄÍ³Ò»ÃüÁî£¬ControlTask ¸ºÔğ·Ö·¢¸ø¾ßÌåÈÎÎñ */
     AppCommandId_t id;
     uint32_t param0;
     uint32_t param1;
@@ -34,7 +34,16 @@ typedef struct
 
 typedef struct
 {
-    /* LoRa é¢„ç•™æ•°æ®åŒ…ç»“æ„ï¼Œåç»­å¯ç”¨å°„é¢‘é©±åŠ¨åç›´æ¥å¤ç”¨ */
+    /* INS/PDR Ö»Êä³ö±¾ÖÜÆÚÎ»ÒÆÔöÁ¿£¬Î»ÖÃÀÛ¼Æ½»¸ø ControlTask¡£ */
+    float delta_m[3];
+    float velocity_mps[3];
+    float attitude_rad[3];
+    float yaw_deg;
+} NavDeltaMsg_t;
+
+typedef struct
+{
+    /* LoRa Ô¤ÁôÊı¾İ°ü½á¹¹£¬ºóĞøÆôÓÃÉäÆµÇı¶¯ºóÖ±½Ó¸´ÓÃ */
     uint8_t port;
     uint8_t rssi_valid;
     int16_t rssi_dbm;
@@ -44,13 +53,13 @@ typedef struct
 
 typedef struct
 {
-    /*è¿”èˆªå‘½ä»¤ï¼Œå½’é€”ç‰¹è‰²*/
+    /*·µº½ÃüÁî£¬¹éÍ¾ÌØÉ«*/
     AppCommandId_t id;
 } ReturnCommandMsg_t;
 
 typedef struct
 {
-    char text[APP_DEBUG_LOG_TEXT_LEN];//ç»å…¸ä¸²å£å¸å·´æˆˆ
+    char text[APP_DEBUG_LOG_TEXT_LEN];//¾­µä´®¿ÚµÛ°Í¸ê
 } DebugLogMsg_t;
 
 #endif

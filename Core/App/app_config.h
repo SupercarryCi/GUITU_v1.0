@@ -10,51 +10,52 @@ extern "C" {
 #include "spi.h"
 #include "usart.h"
 
-#define APP_GYRO_UART_HANDLE        huart2      /* é™€èžºä»ªæ•°æ®æŽ¥æ”¶ä¸²å£ (USART2) */
-#define APP_DEBUG_UART_HANDLE       huart3      /* è°ƒè¯•æ—¥å¿—è¾“å‡ºä¸²å£ (USART3) */
-#define APP_UWB_UART_HANDLE         huart1      /* UWBæ ‡ç­¾å¡é…ç½®ä¸²å£ (USART1) */
+#define APP_GYRO_UART_HANDLE        huart2      /* ÍÓÂÝÒÇÊý¾Ý½ÓÊÕ´®¿Ú (USART2) */
+#define APP_DEBUG_UART_HANDLE       huart3      /* µ÷ÊÔÈÕÖ¾Êä³ö´®¿Ú (USART3) */
+#define APP_UWB_UART_HANDLE         huart1      /* UWB±êÇ©¿¨ÅäÖÃ´®¿Ú (USART1) */
 
-#define APP_DISPLAY_SPI_HANDLE      hspi1       /* æ˜¾ç¤ºå± SPI æŽ¥å£ */
-#define APP_TOUCH_SPI_HANDLE        hspi2       /* è§¦æ‘¸é¢æ¿ SPI æŽ¥å£ */
-#define APP_LORA_SPI_HANDLE         hspi4       /* LoRa å°„é¢‘æ¨¡å— SPI æŽ¥å£ */
+#define APP_DISPLAY_SPI_HANDLE      hspi1       /* ÏÔÊ¾ÆÁ SPI ½Ó¿Ú */
+#define APP_TOUCH_SPI_HANDLE        hspi2       /* ´¥ÃþÃæ°å SPI ½Ó¿Ú */
+#define APP_LORA_SPI_HANDLE         hspi4       /* LoRa ÉäÆµÄ£¿é SPI ½Ó¿Ú */
 
-#define APP_SPO2_I2C_HANDLE         hi2c1       /* è¡€æ°§ä¼ æ„Ÿå™¨ I2C æŽ¥å£ */
+#define APP_SPO2_I2C_HANDLE         hi2c1       /* ÑªÑõ´«¸ÐÆ÷ I2C ½Ó¿Ú */
 
-#define APP_ADC_HANDLE              hadc1       /* é€šç”¨ ADC (ç”µæ± /ç”µåŽ‹é‡‡é›†) */
+#define APP_ADC_HANDLE              hadc1       /* Í¨ÓÃ ADC (µç³Ø/µçÑ¹²É¼¯) */
 
-#define APP_GYRO_RX_MAX_LEN         96U         /* å•æ¬¡ DMA æŠ•é˜Ÿåˆ—çš„æœ€å¤§å­—èŠ‚æ•° */
-#define APP_GYRO_DMA_BUFFER_SIZE    APP_GYRO_RX_MAX_LEN   /* DMA æŽ¥æ”¶ç¼“å†²åŒºå¤§å° */
-#define APP_GYRO_QUEUE_DEPTH        16U         /* é™€èžºä»ªæŽ¥æ”¶é˜Ÿåˆ—æ·±åº¦  */
+#define APP_GYRO_RX_MAX_LEN         96U         /* µ¥´Î DMA Í¶¶ÓÁÐµÄ×î´ó×Ö½ÚÊý */
+#define APP_GYRO_DMA_BUFFER_SIZE    APP_GYRO_RX_MAX_LEN   /* DMA ½ÓÊÕ»º³åÇø´óÐ¡ */
+#define APP_GYRO_QUEUE_DEPTH        16U         /* ÍÓÂÝÒÇ½ÓÊÕ¶ÓÁÐÉî¶È  */
 
-#define APP_UI_CMD_QUEUE_DEPTH      8U          /* ç”¨æˆ·æ“ä½œå‘½ä»¤é˜Ÿåˆ—æ·±åº¦ */
-#define APP_LORA_QUEUE_DEPTH        4U          /* LoRa æ”¶å‘é˜Ÿåˆ—æ·±åº¦ */
-#define APP_RETURN_QUEUE_DEPTH      4U          /* è¿”èˆªæŽ§åˆ¶å‘½ä»¤é˜Ÿåˆ—æ·±åº¦ */
-#define APP_DEBUG_LOG_QUEUE_DEPTH   16U         /* è°ƒè¯•æ—¥å¿—é˜Ÿåˆ—æ·±åº¦ */
+#define APP_UI_CMD_QUEUE_DEPTH      8U          /* ÓÃ»§²Ù×÷ÃüÁî¶ÓÁÐÉî¶È */
+#define APP_NAV_DELTA_QUEUE_DEPTH   16U         /* INS/PDR Î»ÒÆÔöÁ¿¶ÓÁÐÉî¶È */
+#define APP_LORA_QUEUE_DEPTH        4U          /* LoRa ÊÕ·¢¶ÓÁÐÉî¶È */
+#define APP_RETURN_QUEUE_DEPTH      4U          /* ·µº½¿ØÖÆÃüÁî¶ÓÁÐÉî¶È */
+#define APP_DEBUG_LOG_QUEUE_DEPTH   16U         /* µ÷ÊÔÈÕÖ¾¶ÓÁÐÉî¶È */
 
-#define APP_LORA_MAX_PAYLOAD_LEN    128U        /* LoRa å•åŒ…æœ€å¤§è´Ÿè½½å­—èŠ‚æ•° */
-#define APP_DEBUG_LOG_TEXT_LEN      32U         /* å•æ¡è°ƒè¯•æ—¥å¿—æœ€å¤§æ–‡æœ¬é•¿åº¦ */
+#define APP_LORA_MAX_PAYLOAD_LEN    128U        /* LoRa µ¥°ü×î´ó¸ºÔØ×Ö½ÚÊý */
+#define APP_DEBUG_LOG_TEXT_LEN      32U         /* µ¥Ìõµ÷ÊÔÈÕÖ¾×î´óÎÄ±¾³¤¶È */
 
-#define APP_ADC_CHANNEL_COUNT       2U          /* ADC é‡‡é›†é€šé“æ•°é‡ */
-#define APP_ADC_SAMPLE_PERIOD_MS    100U        /* ADC é‡‡æ ·å‘¨æœŸ (ms) */
-#define APP_ADC_SAMPLE_TIMEOUT_MS   20U         /* å•æ¬¡ ADC é‡‡æ ·è¶…æ—¶æ—¶é—´ (ms) */
-#define APP_ADC_VREF_MV             3300U       /* ADC å‚è€ƒç”µåŽ‹ (mV)ï¼Œç”¨äºŽæ¢ç®—å®žé™…ç”µåŽ‹ */
-#define APP_ADC_FULL_SCALE          65535U      /* ADC æ»¡é‡ç¨‹å€¼ (16bit) */
+#define APP_ADC_CHANNEL_COUNT       2U          /* ADC ²É¼¯Í¨µÀÊýÁ¿ */
+#define APP_ADC_SAMPLE_PERIOD_MS    100U        /* ADC ²ÉÑùÖÜÆÚ (ms) */
+#define APP_ADC_SAMPLE_TIMEOUT_MS   20U         /* µ¥´Î ADC ²ÉÑù³¬Ê±Ê±¼ä (ms) */
+#define APP_ADC_VREF_MV             3300U       /* ADC ²Î¿¼µçÑ¹ (mV)£¬ÓÃÓÚ»»ËãÊµ¼ÊµçÑ¹ */
+#define APP_ADC_FULL_SCALE          65535U      /* ADC ÂúÁ¿³ÌÖµ (16bit) */
 
-#define APP_UI_PERIOD_MS            50U         /* UI åˆ·æ–°å‘¨æœŸ (20Hz) ?*/
-#define APP_SPO2_PERIOD_MS          500U        /* è¡€æ°§é‡‡é›†å‘¨æœŸ (2Hz) */
-#define APP_LORA_PERIOD_MS          1000U       /* LoRa æ”¶å‘å‘¨æœŸ (1Hz) */
-#define APP_RETURN_PERIOD_MS        100U        /* è¿”èˆªæŽ§åˆ¶å‘¨æœŸ (10Hz) */
+#define APP_UI_PERIOD_MS            500U        /* UI Ë¢ÐÂÖÜÆÚ (2Hz) */
+#define APP_SPO2_PERIOD_MS          500U        /* ÑªÑõ²É¼¯ÖÜÆÚ (2Hz) */
+#define APP_LORA_PERIOD_MS          1000U       /* LoRa ÊÕ·¢ÖÜÆÚ (1Hz) */
+#define APP_RETURN_PERIOD_MS        100U        /* ·µº½¿ØÖÆÖÜÆÚ (10Hz) */
 
-/* LoRa å½“å‰åªé¢„ç•™æ¡†æž¶ï¼Œé»˜è®¤ä¸å¯ç”¨çœŸå®žæ”¶å‘ä»»åŠ¡ã€‚ */
+/* LoRa µ±Ç°Ö»Ô¤Áô¿ò¼Ü£¬Ä¬ÈÏ²»ÆôÓÃÕæÊµÊÕ·¢ÈÎÎñ¡£ */
 #define APP_LORA_ENABLE_DEFAULT     1U
 
-#define APP_INIT_GYRO_DMA           (1UL << 0)  /* é™€èžºä»ª DMA æŽ¥æ”¶å¯åŠ¨å®Œæˆ */
-#define APP_INIT_UI                 (1UL << 1)  /* UI ç¡¬ä»¶åˆå§‹åŒ–å®Œæˆ */
-#define APP_INIT_LORA               (1UL << 2)  /* LoRa ç¡¬ä»¶åˆå§‹åŒ–å®Œæˆ */
-#define APP_INIT_SPO2               (1UL << 3)  /* è¡€æ°§ä¼ æ„Ÿå™¨åˆå§‹åŒ–å®Œæˆ */
-#define APP_INIT_ADC                (1UL << 4)  /* ADC é‡‡æ ·åˆå§‹åŒ–å®Œæˆ */
-#define APP_INIT_DEBUG              (1UL << 5)  /* è°ƒè¯•ä¸²å£åˆå§‹åŒ–å®Œæˆ */
-#define APP_INIT_UWB                (1UL << 6)  /* UWB åˆå§‹åŒ–å®Œæˆ */
+#define APP_INIT_GYRO_DMA           (1UL << 0)  /* ÍÓÂÝÒÇ DMA ½ÓÊÕÆô¶¯Íê³É */
+#define APP_INIT_UI                 (1UL << 1)  /* UI Ó²¼þ³õÊ¼»¯Íê³É */
+#define APP_INIT_LORA               (1UL << 2)  /* LoRa Ó²¼þ³õÊ¼»¯Íê³É */
+#define APP_INIT_SPO2               (1UL << 3)  /* ÑªÑõ´«¸ÐÆ÷³õÊ¼»¯Íê³É */
+#define APP_INIT_ADC                (1UL << 4)  /* ADC ²ÉÑù³õÊ¼»¯Íê³É */
+#define APP_INIT_DEBUG              (1UL << 5)  /* µ÷ÊÔ´®¿Ú³õÊ¼»¯Íê³É */
+#define APP_INIT_UWB                (1UL << 6)  /* UWB ³õÊ¼»¯Íê³É */
 
 #ifdef __cplusplus
 }
