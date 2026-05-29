@@ -11,7 +11,7 @@
 #include <math.h>
 
 #define INS_PDR_DT_S 0.005f   /* 陀螺仪频率200Hz */
-#define INS_PDR_ENABLE_LOGIC 0U /* 0: 暂时保留接口，禁用未完成的 INS/PDR 逻辑 */
+#define INS_PDR_ENABLE_LOGIC 1U /* 0: 暂时保留接口，禁用未完成的 INS/PDR 逻辑 */
 
 #if (INS_PDR_ENABLE_LOGIC != 0U)
 static PdrStepDetector s_pdr_det;
@@ -133,20 +133,25 @@ void Task_Ins_Pdr_Entry(void *argument)
             selected_delta_m.x = 0.0f;
             selected_delta_m.y = 0.0f;
             selected_delta_m.z = 0.0f;
-            use_pdr = 0U;
+            use_pdr = 1U;
 
             if ((fabsf(gyro.frame.angle_deg[0]) < 30.0f) &&
                 (fabsf(gyro.frame.angle_deg[1]) < 30.0f))//手臂横过来我就ins，嘎嘎
             {
-                if (PFT_StepDistanceToPedDelta(pdr_out.delta_distance_m,
-                                   gyro.frame.angle_deg[2],
-                                   &selected_delta_m) == PFT_OK)
-                {
-                    use_pdr = 1U;
-                }
+                use_pdr = 0U;
             }
 
-            if (use_pdr == 0U)
+            if (use_pdr != 0U)
+            {
+                /* PDR只在判到一步时输出位移，未判步时保持0增量，避免和INS增量重复累计。 */
+                if (pdr_out.step_detected != 0U)
+                {
+                    (void)PFT_StepDistanceToPedDelta(pdr_out.delta_distance_m,
+                                                     gyro.frame.angle_deg[2],
+                                                     &selected_delta_m);
+                }
+            }
+            else
             {
                 selected_delta_m = ins_delta_m;
             }
@@ -155,9 +160,19 @@ void Task_Ins_Pdr_Entry(void *argument)
             nav_delta.delta_m[1] = selected_delta_m.y;
             nav_delta.delta_m[2] = selected_delta_m.z;
 
-            nav_delta.velocity_mps[0] = pin_state.velocity_ped_mps.x;
-            nav_delta.velocity_mps[1] = pin_state.velocity_ped_mps.y;
-            nav_delta.velocity_mps[2] = pin_state.velocity_ped_mps.z;
+            if (use_pdr != 0U)
+            {
+                /* PDR当前只输出步进位移，速度没有可靠来源，避免混入INS速度。 */
+                nav_delta.velocity_mps[0] = 0.0f;
+                nav_delta.velocity_mps[1] = 0.0f;
+                nav_delta.velocity_mps[2] = 0.0f;
+            }
+            else
+            {
+                nav_delta.velocity_mps[0] = pin_state.velocity_ped_mps.x;
+                nav_delta.velocity_mps[1] = pin_state.velocity_ped_mps.y;
+                nav_delta.velocity_mps[2] = pin_state.velocity_ped_mps.z;
+            }
 
             nav_delta.attitude_rad[0] = gyro.frame.angle_deg[0] * 0.0174532925f;
             nav_delta.attitude_rad[1] = gyro.frame.angle_deg[1] * 0.0174532925f;
@@ -174,4 +189,3 @@ void Task_Ins_Pdr_Entry(void *argument)
 #endif
     }
 }
-

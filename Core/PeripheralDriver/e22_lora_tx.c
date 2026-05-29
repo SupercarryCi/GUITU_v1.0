@@ -45,10 +45,10 @@ void e22_lora_tx_get_default_config(e22_lora_tx_config_t *config)
     config->pa_cfg.hp_max = 0x07;
     config->pa_cfg.device_sel = 0x00;
     config->pa_cfg.pa_lut = 0x01;
-    config->sf = SX126X_LORA_SF7;
-    config->bw = SX126X_LORA_BW_500;
-    config->cr = SX126X_LORA_CR_4_5;
-    config->ldro = false;
+    config->sf = SX126X_LORA_SF9;
+    config->bw = SX126X_LORA_BW_125;
+    config->cr = SX126X_LORA_CR_4_8;
+    config->ldro = true;
     config->preamble_len = 8U;
     config->crc_on = true;
     config->invert_iq = false;

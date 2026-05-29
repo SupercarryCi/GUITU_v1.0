@@ -219,7 +219,7 @@ static int32_t App_StartRuntimeTasks(void)
     const osThreadAttr_t gyroTaskAttr = {
         .name = "GyroTask",
         .priority = osPriorityHigh,
-        .stack_size = 2048U
+        .stack_size = 512U
     };
     const osThreadAttr_t uiTaskAttr = {
         .name = "UiTask",
@@ -229,22 +229,22 @@ static int32_t App_StartRuntimeTasks(void)
     const osThreadAttr_t controlTaskAttr = {
         .name = "ControlTask",
         .priority = osPriorityAboveNormal,
-        .stack_size = 1024U
+        .stack_size = 512U
     };
     const osThreadAttr_t loraTaskAttr = {
         .name = "LoraTask",
         .priority = osPriorityNormal,
-        .stack_size = 1536U
+        .stack_size = 1024U
     };
     const osThreadAttr_t spo2TaskAttr = {
         .name = "Spo2Task",
         .priority = osPriorityLow,
-        .stack_size = 1024U
+        .stack_size = 512U
     };
     const osThreadAttr_t adcTaskAttr = {
         .name = "AdcTask",
         .priority = osPriorityLow,
-        .stack_size = 1024U
+        .stack_size = 512U
     };
     const osThreadAttr_t debugTaskAttr = {
         .name = "DebugTask",
@@ -254,12 +254,12 @@ static int32_t App_StartRuntimeTasks(void)
     const osThreadAttr_t returnTaskAttr = {
         .name = "ReturnTask",
         .priority = osPriorityAboveNormal,
-        .stack_size = 1536U
+        .stack_size = 2048U
     };
     const osThreadAttr_t ins_pdr_TaskAttr = {
         .name = "ins_pdr_Task",
         .priority = osPriorityAboveNormal,
-        .stack_size = 3072U
+        .stack_size = 1024U
     };
 
     g_gyroTaskHandle = osThreadNew(Task_GyroEntry, NULL, &gyroTaskAttr);

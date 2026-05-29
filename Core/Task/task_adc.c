@@ -29,7 +29,7 @@
 #include <stdio.h>
 #include <string.h>
 
-static uint32_t s_adcTxCnt = 0U; /*测试变量*/
+//static uint32_t s_adcTxCnt = 0U; /*测试变量*/
 
 static uint16_t s_adcDmaBuffer[APP_ADC_CHANNEL_COUNT] __attribute__((section(".dma_buffer"), aligned(32))); /* DMA 缓冲区 */
 static volatile uint32_t s_adcDmaErrorCount = 0U;
@@ -131,18 +131,18 @@ void Task_AdcEntry(void *argument)
                 }
 
             /* 测试: 每 10 个 ADC 周期通过 LoRa 发送一次气体浓度⬇️ */
-                s_adcTxCnt++;
-                if ((s_adcTxCnt % 10U) == 0U)
-                {
-                    char text[64];
+//                s_adcTxCnt++;
+//                if ((s_adcTxCnt % 10U) == 0U)
+//                {
+//                    char text[64];
 
-                    snprintf(text,
-                             sizeof(text),
-                             "g0=%.2f,g1=%.2f",
-                             (double)adc.gas_concentration[0],
-                             (double)adc.gas_concentration[1]);
-                    (void)Lora_SendBytes((const uint8_t *)text, (uint16_t)strlen(text));
-                }
+//                    snprintf(text,
+//                             sizeof(text),
+//                             "g0=%.2f,g1=%.2f",
+//                             (double)adc.gas_concentration[0],
+//                             (double)adc.gas_concentration[1]);
+//                    (void)Lora_SendBytes((const uint8_t *)text, (uint16_t)strlen(text));
+//                }
             /* 测试: 每 10 个 ADC 周期通过 LoRa 发送一次气体浓度⬆️ */
 
                 adc.update_count++;

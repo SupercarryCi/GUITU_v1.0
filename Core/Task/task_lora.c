@@ -13,12 +13,13 @@
 #include "e22_lora_tx.h"
 #include "gpio.h"
 #include "spi.h"
+#include <stdio.h>
 #include <string.h>
 
 /*
- * LoRa ä»»åŠ¡é“¾è·¯ï¼š
- * PE10(E22_DIO1) è¿› EXTI ä¸­æ–­ï¼Œä¸­æ–­é‡Œåªç½® SYS_EVT_LORA_DIO1ï¼›
- * å…·ä½“ SX126x IRQ è¯»å–ã€æ¸…æ ‡å¿—å’Œæ”¶åŒ…éƒ½æ”¾åœ¨ä»»åŠ¡ä¸Šä¸‹æ–‡ä¸­å®Œæˆï¼Œé¿å…åœ¨ ISR ä¸­è·‘ SPIã€‚
+ * LoRa ÈÎÎñÁ´Â·£º
+ * PE10(E22_DIO1) ½ø EXTI ÖÐ¶Ï£¬ÖÐ¶ÏÀïÖ»ÖÃ SYS_EVT_LORA_DIO1£»
+ * ¾ßÌå SX126x IRQ ¶ÁÈ¡¡¢Çå±êÖ¾ºÍÊÕ°ü¶¼·ÅÔÚÈÎÎñÉÏÏÂÎÄÖÐÍê³É£¬±ÜÃâÔÚ ISR ÖÐÅÜ SPI¡£
  */
 
 int32_t App_LoraHardwareInit(void)
@@ -48,7 +49,7 @@ int32_t App_LoraHardwareInit(void)
     }
 
     e22_lora_tx_get_default_config(&lora_cfg);
-    lora_cfg.tx_power_dbm = 0;
+    lora_cfg.tx_power_dbm = 0;/* -9 ¡ª¡ª +22 ¿Éµ÷ÔöÒæ*/
     lora_cfg.rf_freq_hz = 915000000UL;
 
     if (e22_lora_tx_init(&lora_cfg) == false)
@@ -76,7 +77,7 @@ int32_t App_LoraTransmit(const LoraPacketMsg_t *packet)
         return -2;
     }
 
-    /* é©±åŠ¨è¿”å›ž true è¡¨ç¤ºå·²ç»å¯åŠ¨å‘é€ï¼Œè¿™é‡Œè½¬æ¢æˆä»»åŠ¡å±‚çš„ 0/è´Ÿæ•°è¿”å›žçº¦å®šã€‚ */
+    /* Çý¶¯·µ»Ø true ±íÊ¾ÒÑ¾­Æô¶¯·¢ËÍ£¬ÕâÀï×ª»»³ÉÈÎÎñ²ãµÄ 0/¸ºÊý·µ»ØÔ¼¶¨¡£ */
     return (e22_lora_tx_send(packet->payload, (uint8_t)packet->len) == true) ? 0 : -3;
 }
 
@@ -98,13 +99,93 @@ int32_t Lora_SendBytes(const uint8_t *data, uint16_t len)
     packet.len = len;
     memcpy(packet.payload, data, len);
 
-    /* å‘é€åªå…¥é˜Ÿï¼ŒçœŸæ­£çš„ SPI è®¿é—®ç”± LoraTask ç»Ÿä¸€å®Œæˆã€‚ */
+    /* ·¢ËÍÖ»Èë¶Ó£¬ÕæÕýµÄ SPI ·ÃÎÊÓÉ LoraTask Í³Ò»Íê³É¡£ */
     if (osMessageQueuePut(g_loraTxQueue, &packet, 0U, 0U) != osOK)
     {
         return -3;
     }
 
     return 0;
+}
+
+static int32_t task_lora_float_to_milli(float value)
+{
+    if (value >= 0.0f)
+    {
+        return (int32_t)((value * 1000.0f) + 0.5f);
+    }
+
+    return (int32_t)((value * 1000.0f) - 0.5f);
+}
+
+static int32_t task_lora_float_to_centi(float value)
+{
+    if (value >= 0.0f)
+    {
+        return (int32_t)((value * 100.0f) + 0.5f);
+    }
+
+    return (int32_t)((value * 100.0f) - 0.5f);
+}
+
+static uint16_t task_lora_build_nav_packet(LoraPacketMsg_t *packet)
+{
+    NavState_t nav;
+    int32_t x_mm;
+    int32_t y_mm;
+    int32_t z_mm;
+    int32_t yaw_cdeg;
+    int text_len;
+
+    if (packet == 0)
+    {
+        return 0U;
+    }
+
+    App_StateGetNav(&nav);
+
+    x_mm = task_lora_float_to_milli(nav.data.position_m[0]);
+    y_mm = task_lora_float_to_milli(nav.data.position_m[1]);
+    z_mm = task_lora_float_to_milli(nav.data.position_m[2]);
+    yaw_cdeg = task_lora_float_to_centi(nav.data.YAW_deg);
+
+    memset(packet, 0, sizeof(*packet));
+    text_len = snprintf((char *)packet->payload,
+                        APP_LORA_MAX_PAYLOAD_LEN,
+                        "%ld,%ld,%ld,%ld",
+                        (long)x_mm,
+                        (long)y_mm,
+                        (long)z_mm,
+                        (long)yaw_cdeg);
+    if ((text_len <= 0) || (text_len >= (int)APP_LORA_MAX_PAYLOAD_LEN))
+    {
+        return 0U;
+    }
+
+    packet->len = (uint16_t)text_len;
+    return packet->len;
+}
+
+static void task_lora_send_packet(LoraState_t *lora, const LoraPacketMsg_t *packet)
+{
+    if ((lora == 0) || (packet == 0))
+    {
+        return;
+    }
+
+    if (osMutexAcquire(g_spiLoraMutex, osWaitForever) == osOK)
+    {
+        if (App_LoraTransmit(packet) == 0)
+        {
+            lora->tx_count++;
+        }
+        else
+        {
+            lora->error_count++;
+        }
+
+        osMutexRelease(g_spiLoraMutex);
+    }
 }
 
 int32_t App_LoraPollRx(LoraPacketMsg_t *packet)
@@ -117,8 +198,8 @@ int32_t App_LoraPollRx(LoraPacketMsg_t *packet)
     }
 
     /*
-     * DIO1 å¯èƒ½å¯¹åº” RX_DONEã€TX_DONE æˆ–é”™è¯¯ IRQã€‚
-     * è¿™é‡Œåœ¨ä»»åŠ¡ä¸Šä¸‹æ–‡å¤„ç† SX126x IRQï¼Œå†…éƒ¨ä¼šé€šè¿‡ SPI è¯»å–å¹¶æ¸…é™¤èŠ¯ç‰‡ IRQã€‚
+     * DIO1 ¿ÉÄÜ¶ÔÓ¦ RX_DONE¡¢TX_DONE »ò´íÎó IRQ¡£
+     * ÕâÀïÔÚÈÎÎñÉÏÏÂÎÄ´¦Àí SX126x IRQ£¬ÄÚ²¿»áÍ¨¹ý SPI ¶ÁÈ¡²¢Çå³ýÐ¾Æ¬ IRQ¡£
      */
     e22_lora_tx_dio1_irq_handler();
 
@@ -154,7 +235,7 @@ int32_t Task_LoraInitHardware(void)
 #endif
 }
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)  /*LORAèŠ¯ç‰‡sx126xçš„dio1å¼•è„šä¸­æ–­å›žè°ƒ*/
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)  /*LORAÐ¾Æ¬sx126xµÄdio1Òý½ÅÖÐ¶Ï»Øµ÷*/
 {
     if (GPIO_Pin == E22_DIO1_Pin)
     {
@@ -168,9 +249,15 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)  /*LORAèŠ¯ç‰‡sx126xçš„dio1å¼•è„šä
 void Task_LoraEntry(void *argument)
 {
     LoraState_t lora;
+#if (APP_LORA_ENABLE_DEFAULT != 0U)
+    uint32_t next_nav_tx_tick;
+#endif
 
     (void)argument;
     memset(&lora, 0, sizeof(lora));
+#if (APP_LORA_ENABLE_DEFAULT != 0U)
+    next_nav_tx_tick = 0U;
+#endif
 
     osEventFlagsWait(g_sysEventFlags,
                      SYS_EVT_INIT_DONE,
@@ -182,29 +269,42 @@ void Task_LoraEntry(void *argument)
     #if (APP_LORA_ENABLE_DEFAULT != 0U)
         LoraPacketMsg_t packet;
         uint32_t flags;
+        uint32_t now;
+        uint32_t wait_timeout;
+
+        now = osKernelGetTickCount();
         
-        /*å‘é€*/
+
+
+
+        /*·¢ËÍ*/
         if (osMessageQueueGet(g_loraTxQueue, &packet, 0, 0U) == osOK)
         {
-            if (osMutexAcquire(g_spiLoraMutex, osWaitForever) == osOK)
-            {
-                if (App_LoraTransmit(&packet) == 0)
-                {
-                    lora.tx_count++;
-                }
-                else
-                {
-                    lora.error_count++;
-                }
-                osMutexRelease(g_spiLoraMutex);
-            }
+            task_lora_send_packet(&lora, &packet);
         }
 
-        /*æŽ¥æ”¶*/
+        if ((int32_t)(now - next_nav_tx_tick) >= 0)
+        {
+            /* Ö»·¢ËÍ´¿Êý¾Ý£¬×ø±êµ¥Î»Îªmm£¬yawµ¥Î»Îª0.01¶È¡£ */
+            if (task_lora_build_nav_packet(&packet) != 0U)
+            {
+                task_lora_send_packet(&lora, &packet);
+            }
+
+            next_nav_tx_tick = now + APP_LORA_PERIOD_MS;
+        }
+
+
+
+
+        /*½ÓÊÕ*/
+        now = osKernelGetTickCount();
+        wait_timeout = ((int32_t)(next_nav_tx_tick - now) > 0) ?
+                       (next_nav_tx_tick - now) : 0U;
         flags = osEventFlagsWait(g_sysEventFlags,
                                  SYS_EVT_LORA_DIO1,
                                  osFlagsWaitAny,
-                                 APP_LORA_PERIOD_MS);
+                                 wait_timeout);
         if (((flags & osFlagsError) == 0U) && ((flags & SYS_EVT_LORA_DIO1) != 0U))
         {
             int32_t rx_result;

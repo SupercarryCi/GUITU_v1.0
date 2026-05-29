@@ -28,7 +28,7 @@ extern "C" {
 
 /* GTM1000 标签卡默认配置 */
 #define GTM1000_TAG_IMU_SLEEP_ENABLE       1u
-#define GTM1000_TAG_LOCATE_PERIOD_30MS     10u
+#define GTM1000_TAG_LOCATE_PERIOD_50MS     8u
 #define GTM1000_TAG_CONFIG_DELAY_MS        10u
 
 typedef enum

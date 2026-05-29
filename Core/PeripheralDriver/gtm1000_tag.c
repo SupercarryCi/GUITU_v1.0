@@ -146,7 +146,7 @@ GTM1000_TagStatusTypeDef GTM1000_TagInit(UART_HandleTypeDef *huart)
 
   HAL_Delay(GTM1000_TAG_CONFIG_DELAY_MS);
 
-  status = GTM1000_TagSetLocatePeriod(huart, GTM1000_TAG_LOCATE_PERIOD_30MS);
+  status = GTM1000_TagSetLocatePeriod(huart, GTM1000_TAG_LOCATE_PERIOD_50MS);
   if (status != GTM1000_TAG_OK)
   {
     return status;

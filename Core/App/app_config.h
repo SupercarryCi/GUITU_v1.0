@@ -43,7 +43,7 @@ extern "C" {
 
 #define APP_UI_PERIOD_MS            500U        /* UI 刷新周期 (2Hz) */
 #define APP_SPO2_PERIOD_MS          500U        /* 血氧采集周期 (2Hz) */
-#define APP_LORA_PERIOD_MS          1000U       /* LoRa 收发周期 (1Hz) */
+#define APP_LORA_PERIOD_MS          500U        /* LoRa 导航位置发送/收发轮询周期 (2Hz) */
 #define APP_RETURN_PERIOD_MS        100U        /* 返航控制周期 (10Hz) */
 
 /* LoRa 当前只预留框架，默认不启用真实收发任务。 */

@@ -17,8 +17,8 @@
 /*
  * 不同运动状态步长数据
  */
-#define WALK_STEP_LENGTH                0.7f     /*待定*/
-#define RUN_STEP_LENGTH                 0.7f
+#define WALK_STEP_LENGTH                1.0f     /*待定*/
+#define RUN_STEP_LENGTH                 0.0f
 
 /*
  * IMU 实际采样率：200 Hz
