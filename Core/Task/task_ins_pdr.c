@@ -20,7 +20,6 @@
 #define INS_PDR_HEADING_DIAG_PERIOD_MS 200U
 #define INS_PDR_DIAG_LINE_LEN 64U
 #define INS_PDR_HEADING_UPDATE_PERIOD_MS 50U /* 未判步时也定期刷新行人航向，避免LoRa角度停住。 */
-#define INS_PDR_RAD_TO_DEG 57.2957795f
 #define INS_PDR_HEADING_OFFSET_DEG (-18.50f) /* 安装偏差：139.00度修正到120.50度 */
 
 #if (INS_PDR_ENABLE_LOGIC != 0U)
@@ -43,81 +42,6 @@ static float task_ins_pdr_normalize_deg(float value)
     }
 
     return value;
-}
-
-static int32_t task_ins_pdr_float_to_centi(float value)
-{
-    if (value >= 0.0f)
-    {
-        return (int32_t)((value * 100.0f) + 0.5f);
-    }
-
-    return (int32_t)((value * 100.0f) - 0.5f);
-}
-
-static int32_t task_ins_pdr_float_to_milli(float value)
-{
-    if (value >= 0.0f)
-    {
-        return (int32_t)((value * 1000.0f) + 0.5f);
-    }
-
-    return (int32_t)((value * 1000.0f) - 0.5f);
-}
-
-static float task_ins_pdr_heading_from_xy(float forward_x, float forward_y)
-{
-    return task_ins_pdr_normalize_deg((atan2f(-forward_x, forward_y) * INS_PDR_RAD_TO_DEG) +
-                                      INS_PDR_HEADING_OFFSET_DEG);
-}
-
-static float task_ins_pdr_heading_from_dcm(float dcm[3][3])
-{
-    /*
-     * 当前安装约定：机体 -Y 轴为行人前进轴。
-     * DCM 的列表示机体轴在行人/导航坐标系下的方向。
-     */
-    const float forward_x = -dcm[0][1];
-    const float forward_y = -dcm[1][1];
-
-    return task_ins_pdr_heading_from_xy(forward_x, forward_y);
-}
-
-static float task_ins_pdr_quat_yaw_deg(const pft_quatf_t *quat)
-{
-    float q0;
-    float q1;
-    float q2;
-    float q3;
-    float norm_sq;
-    float inv_norm;
-    float c11;
-    float c21;
-
-    if (quat == NULL)
-    {
-        return 0.0f;
-    }
-
-    norm_sq = (quat->w * quat->w) +
-              (quat->x * quat->x) +
-              (quat->y * quat->y) +
-              (quat->z * quat->z);
-    if (norm_sq < 1e-12f)
-    {
-        return 0.0f;
-    }
-
-    inv_norm = 1.0f / sqrtf(norm_sq);
-    q0 = quat->w * inv_norm;
-    q1 = quat->x * inv_norm;
-    q2 = quat->y * inv_norm;
-    q3 = quat->z * inv_norm;
-
-    c11 = (q0 * q0) + (q1 * q1) - (q2 * q2) - (q3 * q3);
-    c21 = 2.0f * ((q1 * q2) + (q0 * q3));
-
-    return task_ins_pdr_normalize_deg(atan2f(c21, c11) * INS_PDR_RAD_TO_DEG);
 }
 
 #if (INS_PDR_ENABLE_HEADING_DIAG != 0U)
@@ -178,39 +102,19 @@ static void task_ins_pdr_log_heading_diag(const GyroState_t *gyro,
                                           float dcm[3][3],
                                           float current_heading_deg)
 {
-    float raw_yaw_deg;
-    float quat_yaw_deg;
-    float transpose_heading_deg;
-    float current_norm;
-    float transpose_norm;
+    (void)quat;
+    (void)dcm;
+    (void)current_heading_deg;
 
-    if ((gyro == NULL) || (quat == NULL) || (dcm == NULL))
+    if (gyro == NULL)
     {
         return;
     }
 
-    raw_yaw_deg = task_ins_pdr_normalize_deg(gyro->frame.angle_deg[2]);
-    quat_yaw_deg = task_ins_pdr_quat_yaw_deg(quat);
-
-    /*
-     * H2/t is the transposed DCM candidate for checking whether the WIT
-     * quaternion direction is opposite to the current matrix convention.
-     */
-    transpose_heading_deg = task_ins_pdr_heading_from_xy(-dcm[1][0], -dcm[1][1]);
-    current_norm = sqrtf((dcm[0][1] * dcm[0][1]) + (dcm[1][1] * dcm[1][1]));
-    transpose_norm = sqrtf((dcm[1][0] * dcm[1][0]) + (dcm[1][1] * dcm[1][1]));
-
-    task_ins_pdr_diag_uart_log("H1 r%ld q%ld c%ld",
-                               (long)task_ins_pdr_float_to_centi(raw_yaw_deg),
-                               (long)task_ins_pdr_float_to_centi(quat_yaw_deg),
-                               (long)task_ins_pdr_float_to_centi(current_heading_deg));
-    task_ins_pdr_diag_uart_log("H2 t%ld nc%ld nt%ld",
-                               (long)task_ins_pdr_float_to_centi(transpose_heading_deg),
-                               (long)task_ins_pdr_float_to_milli(current_norm),
-                               (long)task_ins_pdr_float_to_milli(transpose_norm));
-    task_ins_pdr_diag_uart_log("RP r%ld p%ld",
-                               (long)task_ins_pdr_float_to_centi(gyro->frame.angle_deg[0]),
-                               (long)task_ins_pdr_float_to_centi(gyro->frame.angle_deg[1]));
+    task_ins_pdr_diag_uart_log("ER:%ld,%ld,%ld",
+                               (long)gyro->frame.angle_raw.x,
+                               (long)gyro->frame.angle_raw.y,
+                               (long)gyro->frame.angle_raw.z);
 }
 #endif
 #endif
@@ -262,9 +166,6 @@ void Task_Ins_Pdr_Entry(void *argument)
                      SYS_EVT_INIT_DONE,
                      osFlagsWaitAny | osFlagsNoClear,
                      osWaitForever);
-#if ((INS_PDR_ENABLE_LOGIC != 0U) && (INS_PDR_ENABLE_HEADING_DIAG != 0U))
-    task_ins_pdr_diag_uart_log("HD start");
-#endif
 
     for (;;)
     {
@@ -298,7 +199,9 @@ void Task_Ins_Pdr_Entry(void *argument)
                 continue;
             }
 
-            ped_heading_deg = task_ins_pdr_heading_from_dcm(pft_out.dcm_body_to_ped);
+            /* 当前调试阶段使用WIT原始yaw，并叠加安装偏移作为PDR航向角。 */
+            ped_heading_deg = task_ins_pdr_normalize_deg(gyro.frame.angle_deg[2] +
+                                                         INS_PDR_HEADING_OFFSET_DEG);
             now_tick = osKernelGetTickCount();
             heading_update_due = ((int32_t)(now_tick - next_heading_update_tick) >= 0) ? 1U : 0U;
 #if (INS_PDR_ENABLE_HEADING_DIAG != 0U)

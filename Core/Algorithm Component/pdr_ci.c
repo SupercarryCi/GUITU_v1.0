@@ -299,8 +299,8 @@ void pdr_step_init(PdrStepDetector* det)
 /*
  * 每次输入一帧 IMU 数据。
  *
- * 当前版本固定使用 gz 作为主轴：
- *   gyro_raw = gz
+ * 当前竖直腕带安装固定使用 gy 作为判步主轴：
+ *   gyro_raw = gy
  *
  * 如果后续要支持 gx/gy/gz 自动主轴选择，可以在外部先选好主轴，
  * 或者把 gx/gy/gz 方差窗口加进来。
@@ -355,7 +355,7 @@ PdrStepOutput pdr_step_update(
     det->has_last_raw = 1;
 #else
     (void)gx;
-    (void)gy;
+    (void)gz;
 #endif
 
     det->sample_index++;
@@ -364,9 +364,9 @@ PdrStepOutput pdr_step_update(
      * ------------------------------------------------------------
      * 1. 陀螺仪主轴滤波
      * ------------------------------------------------------------
-     * Python 脚本中 USE_AXIS = "gz"，这里直接使用 gz。
+     * Python 脚本中 USE_AXIS = "gy"，这里直接使用 gy。
      */
-    float gyro_raw = (float)gz;
+    float gyro_raw = (float)gy;
 
     float gyro_hp = pdr_hpf_update(&det->gyro_hpf, gyro_raw);
     float gyro_f = pdr_lpf_update(&det->gyro_lpf, gyro_hp);

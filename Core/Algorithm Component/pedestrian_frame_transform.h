@@ -50,7 +50,7 @@ typedef struct
     float w;
     float x;
     float y;
-    float z;
+    float z;//四元数在改过安装方向（水平->竖直）后顺序不变
 } pft_quatf_t;
 
 typedef struct
