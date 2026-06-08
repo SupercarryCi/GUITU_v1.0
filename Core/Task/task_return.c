@@ -7,12 +7,13 @@
 #include "app_state.h"
 #include "cmsis_os.h"
 #include "task_debug.h"
+#include "task_lora.h"
 
 #include <string.h>
 
 /*
  * 返航任务默认不运行。
- * UI 发开始命令后进入 RUNNING，周期读取整机快照并调用 App_ReturnStep()。
+ * UI 发开始命令后进入 RUNNING，再次点击 HOME 后回到 IDLE。
  */
 /* 待你完善：返航开始时装载已记录路径、选择起始目标点、初始化控制参数。 */
 __weak int32_t App_ReturnOnStart(ReturnState_t *state)
@@ -21,10 +22,9 @@ __weak int32_t App_ReturnOnStart(ReturnState_t *state)
     return 0;
 }
 
-/* 待你完善：根据导航状态和路径点计算返航控制输出。 */
+/* 待你完善：后续如果需要独立返航控制输出，可以重新接入这个弱函数。 */
 __weak int32_t App_ReturnStep(const AppSnapshot_t *snapshot, ReturnState_t *state)
 {
-    /* 业务接入点：返回 0=继续，>0=完成，<0=故障。 */
     (void)snapshot;
     (void)state;
     return 0;
@@ -36,10 +36,12 @@ __weak void App_ReturnOnStop(ReturnState_t *state)
     (void)state;
 }
 
-static void task_return_set_mode(ReturnState_t *state, ReturnMode_t mode)
+static void task_return_send_lora_start_flag(void)
 {
-    state->mode = mode;
-    App_StateSetReturn(state);
+    const uint8_t flag = (uint8_t)'R';
+
+    /* 只投递一次返航开始标志；队列满时允许丢弃，避免阻塞返航状态机。 */
+    (void)Lora_SendBytes(&flag, 1U);
 }
 
 void Task_ReturnEntry(void *argument)
@@ -59,87 +61,45 @@ void Task_ReturnEntry(void *argument)
 
     for (;;)
     {
-        if (state.mode == RETURN_MODE_IDLE ||
-            state.mode == RETURN_MODE_DONE ||
-            state.mode == RETURN_MODE_FAULT)
+        if (osMessageQueueGet(g_returnCmdQueue, &command, NULL, osWaitForever) != osOK)
         {
-            if (osMessageQueueGet(g_returnCmdQueue, &command, NULL, osWaitForever) != osOK)
+            continue;
+        }
+
+        if (command.id == APP_CMD_RETURN_HOME_START)
+        {
+            if (state.mode == RETURN_MODE_RUNNING)
             {
                 continue;
             }
 
-            if (command.id == APP_CMD_RETURN_HOME_START)
+            memset(&state, 0, sizeof(state));
+            state.mode = RETURN_MODE_RUNNING;
+            if (App_ReturnOnStart(&state) != 0)
             {
                 memset(&state, 0, sizeof(state));
-                state.mode = RETURN_MODE_RUNNING;
-                if (App_ReturnOnStart(&state) != 0)
-                {
-                    state.mode = RETURN_MODE_FAULT;
-                    state.error_count++;
-                    App_StateSetReturn(&state);
-                    osEventFlagsSet(g_sysEventFlags, SYS_EVT_RETURN_FAULT);
-                    continue;
-                }
-
+                state.mode = RETURN_MODE_IDLE;
                 App_StateSetReturn(&state);
-                osEventFlagsSet(g_sysEventFlags, SYS_EVT_RETURN_ACTIVE);
-                App_DebugLog("return home start");
-            }
-        }
-        else
-        {
-            AppSnapshot_t snapshot;
-            int32_t step_result = 0;
-
-            if (osMessageQueueGet(g_returnCmdQueue, &command, NULL, APP_RETURN_PERIOD_MS) == osOK)
-            {
-                if (command.id == APP_CMD_RETURN_HOME_STOP)
-                {
-                    App_ReturnOnStop(&state);
-                    task_return_set_mode(&state, RETURN_MODE_IDLE);
-                    App_DebugLog("return home stop");
-                    continue;
-                }
-                if (command.id == APP_CMD_RETURN_HOME_PAUSE)
-                {
-                    task_return_set_mode(&state, RETURN_MODE_PAUSED);
-                    continue;
-                }
-                if (command.id == APP_CMD_RETURN_HOME_RESUME)
-                {
-                    task_return_set_mode(&state, RETURN_MODE_RUNNING);
-                    continue;
-                }
-            }
-
-            if (state.mode != RETURN_MODE_RUNNING)
-            {
+                (void)osEventFlagsClear(g_sysEventFlags, SYS_EVT_RETURN_ACTIVE);
+                App_DebugLog("return home start failed");
                 continue;
             }
 
-            memset(&snapshot, 0, sizeof(snapshot));
-            App_StateGetSnapshot(&snapshot);
-            step_result = App_ReturnStep(&snapshot, &state);
-            state.step_count++;
-
-            if (step_result > 0)
+            App_StateSetReturn(&state);
+            (void)osEventFlagsSet(g_sysEventFlags, SYS_EVT_RETURN_ACTIVE);
+            task_return_send_lora_start_flag();
+            App_DebugLog("return home start");
+        }
+        else if (command.id == APP_CMD_RETURN_HOME_STOP)
+        {
+            if (state.mode == RETURN_MODE_RUNNING)
             {
-                state.mode = RETURN_MODE_DONE;
+                App_ReturnOnStop(&state);
+                memset(&state, 0, sizeof(state));
+                state.mode = RETURN_MODE_IDLE;
                 App_StateSetReturn(&state);
-                osEventFlagsSet(g_sysEventFlags, SYS_EVT_RETURN_DONE);
-                App_DebugLog("return home done");
-            }
-            else if (step_result < 0)
-            {
-                state.mode = RETURN_MODE_FAULT;
-                state.error_count++;
-                App_StateSetReturn(&state);
-                osEventFlagsSet(g_sysEventFlags, SYS_EVT_RETURN_FAULT);
-                App_DebugLog("return home fault");
-            }
-            else
-            {
-                App_StateSetReturn(&state);
+                (void)osEventFlagsClear(g_sysEventFlags, SYS_EVT_RETURN_ACTIVE);
+                App_DebugLog("return home stop");
             }
         }
     }

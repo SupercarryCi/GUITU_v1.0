@@ -103,10 +103,7 @@ typedef struct
 typedef enum
 {
     RETURN_MODE_IDLE = 0,          /* 空闲：未启动返航 */
-    RETURN_MODE_RUNNING,           /* 运行中：正在执行返航路径 */
-    RETURN_MODE_PAUSED,            /* 暂停：返航被用户暂停 */
-    RETURN_MODE_DONE,              /* 完成：已成功抵达目标 */
-    RETURN_MODE_FAULT              /* 故障：返航过程中出错 */
+    RETURN_MODE_RUNNING            /* 运行中：正在执行返航路径 */
 } ReturnMode_t;
 
 typedef struct
@@ -115,8 +112,19 @@ typedef struct
     uint32_t path_points;          /* 已记录的路径点数量 */
     uint32_t target_index;         /* 当前目标点索引 */
     uint32_t step_count;           /* 累计执行步数 */
-    uint32_t error_count;          /* 返航过程错误次数 */
 } ReturnState_t;
+
+typedef struct
+{
+    uint8_t valid;                 /* 引导输出是否有效 */
+    uint8_t return_mode;           /* Dijkstra 算法是否处于返航模式 */
+    uint8_t route_valid;           /* 是否已生成可用返航路径 */
+    uint8_t arrived_home;          /* 是否到达 home 节点 */
+    int32_t distance_to_next_mm;   /* 到下一个关键点的距离 */
+    int16_t bearing_to_next_cdeg;  /* 到下一个关键点的绝对方向 */
+    int16_t relative_bearing_cdeg; /* 相对当前航向的方向 */
+    uint16_t next_route_index;     /* 当前目标路线点索引 */
+} ReturnGuideState_t;
 
 typedef struct
 {
@@ -128,6 +136,7 @@ typedef struct
     UiState_t        ui;           /* UI 状态 */
     LoraState_t      lora;         /* LoRa 状态 */
     ReturnState_t    return_home;  /* 返航状态 */
+    ReturnGuideState_t return_guide; /* 返航引导缓存 */
 } AppSnapshot_t;//系统快照
 
 /* ---------- 状态管理接口 ---------- */
@@ -172,6 +181,10 @@ void App_StateGetLora(LoraState_t *state);
 /* 返航状态读写 */
 void App_StateSetReturn(const ReturnState_t *state);
 void App_StateGetReturn(ReturnState_t *state);
+
+/* 返航引导缓存读写 */
+void App_StateSetReturnGuide(const ReturnGuideState_t *state);
+void App_StateGetReturnGuide(ReturnGuideState_t *state);
 
 /* 一次性读取所有模块状态到快照结构体中 */
 void App_StateGetSnapshot(AppSnapshot_t *snapshot);

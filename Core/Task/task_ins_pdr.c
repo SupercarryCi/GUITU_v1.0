@@ -21,6 +21,9 @@
 #define INS_PDR_DIAG_LINE_LEN 64U
 #define INS_PDR_HEADING_UPDATE_PERIOD_MS 50U /* 未判步时也定期刷新行人航向，避免LoRa角度停住。 */
 #define INS_PDR_HEADING_OFFSET_DEG (-18.50f) /* 安装偏差：139.00度修正到120.50度 */
+#define INS_PDR_ENABLE_HEADING_SNAP 0U       /* 临时功能：1=四向吸附，0=关闭 */
+#define INS_PDR_HEADING_SNAP_DEG 45.0f       /* 小于该偏差时吸附到0/90/-90/-180度 */
+#define INS_PDR_HEADING_SNAP_CONFIRM_COUNT 2U /* 新吸附方向连续出现2次才切换 */
 
 #if (INS_PDR_ENABLE_LOGIC != 0U)
 static PdrStepDetector s_pdr_det;
@@ -42,6 +45,81 @@ static float task_ins_pdr_normalize_deg(float value)
     }
 
     return value;
+}
+
+static float task_ins_pdr_snap_heading_deg(float heading_deg)
+{
+#if (INS_PDR_ENABLE_HEADING_SNAP != 0U)
+    static float stable_heading_deg;
+    static float pending_heading_deg;
+    static uint8_t has_stable_heading = 0U;
+    static uint8_t pending_count = 0U;
+    const float heading = task_ins_pdr_normalize_deg(heading_deg);
+    float candidate_heading_deg;
+
+    if (fabsf(heading) < INS_PDR_HEADING_SNAP_DEG)
+    {
+        candidate_heading_deg = 0.0f;
+    }
+    else if (fabsf(heading - 90.0f) < INS_PDR_HEADING_SNAP_DEG)
+    {
+        candidate_heading_deg = 90.0f;
+    }
+    else if (fabsf(heading + 90.0f) < INS_PDR_HEADING_SNAP_DEG)
+    {
+        candidate_heading_deg = -90.0f;
+    }
+    else if ((180.0f - fabsf(heading)) < INS_PDR_HEADING_SNAP_DEG)
+    {
+        candidate_heading_deg = -180.0f;
+    }
+    else
+    {
+        candidate_heading_deg = heading;
+    }
+
+    if (has_stable_heading == 0U)
+    {
+        stable_heading_deg = candidate_heading_deg;
+        has_stable_heading = 1U;
+        pending_count = 0U;
+        return stable_heading_deg;
+    }
+
+    if (candidate_heading_deg == stable_heading_deg)
+    {
+        pending_count = 0U;
+        return stable_heading_deg;
+    }
+
+    if ((pending_count == 0U) || (candidate_heading_deg != pending_heading_deg))
+    {
+        pending_heading_deg = candidate_heading_deg;
+        pending_count = 1U;
+        return stable_heading_deg;
+    }
+
+    pending_count++;
+    if (pending_count >= INS_PDR_HEADING_SNAP_CONFIRM_COUNT)
+    {
+        stable_heading_deg = candidate_heading_deg;
+        pending_count = 0U;
+    }
+
+    return stable_heading_deg;
+#else
+    return heading_deg;
+#endif
+}
+
+static int32_t task_ins_pdr_float_to_centi(float value)
+{
+    if (value >= 0.0f)
+    {
+        return (int32_t)((value * 100.0f) + 0.5f);
+    }
+
+    return (int32_t)((value * 100.0f) - 0.5f);
 }
 
 #if (INS_PDR_ENABLE_HEADING_DIAG != 0U)
@@ -102,19 +180,13 @@ static void task_ins_pdr_log_heading_diag(const GyroState_t *gyro,
                                           float dcm[3][3],
                                           float current_heading_deg)
 {
+    (void)gyro;
     (void)quat;
     (void)dcm;
-    (void)current_heading_deg;
 
-    if (gyro == NULL)
-    {
-        return;
-    }
-
-    task_ins_pdr_diag_uart_log("ER:%ld,%ld,%ld",
-                               (long)gyro->frame.angle_raw.x,
-                               (long)gyro->frame.angle_raw.y,
-                               (long)gyro->frame.angle_raw.z);
+    /* PH单位为0.01度，来源是当前实际用于PDR/LoRa的行人航向角。 */
+    task_ins_pdr_diag_uart_log("PH:%ld",
+                               (long)task_ins_pdr_float_to_centi(current_heading_deg));
 }
 #endif
 #endif
@@ -200,8 +272,9 @@ void Task_Ins_Pdr_Entry(void *argument)
             }
 
             /* 当前调试阶段使用WIT原始yaw，并叠加安装偏移作为PDR航向角。 */
-            ped_heading_deg = task_ins_pdr_normalize_deg(gyro.frame.angle_deg[2] +
-                                                         INS_PDR_HEADING_OFFSET_DEG);
+            ped_heading_deg = task_ins_pdr_snap_heading_deg(
+                task_ins_pdr_normalize_deg(gyro.frame.angle_deg[2] +
+                                           INS_PDR_HEADING_OFFSET_DEG));
             now_tick = osKernelGetTickCount();
             heading_update_due = ((int32_t)(now_tick - next_heading_update_tick) >= 0) ? 1U : 0U;
 #if (INS_PDR_ENABLE_HEADING_DIAG != 0U)

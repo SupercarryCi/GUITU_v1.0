@@ -1575,6 +1575,16 @@
               <FileType>5</FileType>
               <FilePath>..\Core\Algorithm Component\pdr_ci.h</FilePath>
             </File>
+            <File>
+              <FileName>dijkstra.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Algorithm Component\dijkstra.c</FilePath>
+            </File>
+            <File>
+              <FileName>dijkstra.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Core\Algorithm Component\dijkstra.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

@@ -12,8 +12,6 @@
 #define SYS_EVT_LORA_RX            (1UL << 7)   /* LoRa 收到完整数据包 */
 #define SYS_EVT_LORA_TX_DONE       (1UL << 8)   /* LoRa 发送完成 */
 #define SYS_EVT_RETURN_ACTIVE      (1UL << 9)   /* 返航模式激活 */
-#define SYS_EVT_RETURN_DONE        (1UL << 10)  /* 返航完成 */
-#define SYS_EVT_RETURN_FAULT       (1UL << 11)  /* 返航故障 */
 #define SYS_EVT_LORA_DIO1          (1UL << 12)  /* LoRa DIO1 外部中断到达 */
 #define SYS_EVT_NAV_DELTA_READY    (1UL << 13)  /* INS/PDR 位移增量就绪 */
 

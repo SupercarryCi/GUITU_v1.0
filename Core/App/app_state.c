@@ -15,6 +15,7 @@ static Spo2State_t g_spo2State;
 static UiState_t g_uiState;
 static LoraState_t g_loraState;
 static ReturnState_t g_returnState;
+static ReturnGuideState_t g_returnGuideState;
 static osMutexId_t g_stateMutex = NULL;
 
 int32_t App_StateInit(void)
@@ -28,6 +29,7 @@ int32_t App_StateInit(void)
     memset(&g_uiState, 0, sizeof(g_uiState));
     memset(&g_loraState, 0, sizeof(g_loraState));
     memset(&g_returnState, 0, sizeof(g_returnState));
+    memset(&g_returnGuideState, 0, sizeof(g_returnGuideState));
 
     g_returnState.mode = RETURN_MODE_IDLE;
 
@@ -259,6 +261,30 @@ void App_StateGetReturn(ReturnState_t *state)
     osMutexRelease(g_stateMutex);
 }
 
+void App_StateSetReturnGuide(const ReturnGuideState_t *state)
+{
+    if ((state == NULL) || (g_stateMutex == NULL))
+    {
+        return;
+    }
+
+    osMutexAcquire(g_stateMutex, osWaitForever);
+    g_returnGuideState = *state;
+    osMutexRelease(g_stateMutex);
+}
+
+void App_StateGetReturnGuide(ReturnGuideState_t *state)
+{
+    if ((state == NULL) || (g_stateMutex == NULL))
+    {
+        return;
+    }
+
+    osMutexAcquire(g_stateMutex, osWaitForever);
+    *state = g_returnGuideState;
+    osMutexRelease(g_stateMutex);
+}
+
 void App_StateGetSnapshot(AppSnapshot_t *snapshot)
 {
     if ((snapshot == NULL) || (g_stateMutex == NULL))
@@ -276,5 +302,6 @@ void App_StateGetSnapshot(AppSnapshot_t *snapshot)
     snapshot->ui = g_uiState;
     snapshot->lora = g_loraState;
     snapshot->return_home = g_returnState;
+    snapshot->return_guide = g_returnGuideState;
     osMutexRelease(g_stateMutex);
 }
