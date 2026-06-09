@@ -153,15 +153,43 @@ static uint32_t Ui_BaseDistanceMeter(const AppSnapshot_t *snapshot)
     return Ui_FloatToU32(sqrtf((x * x) + (y * y) + (z * z)));
 }
 
+static float Ui_CdegToRad(int16_t cdeg)
+{
+    return ((float)cdeg * UI_PI) / 18000.0f;
+}
+
+static uint32_t Ui_DistanceMmToMeter(int32_t distance_mm)
+{
+    if (distance_mm <= 0)
+    {
+        return 0U;
+    }
+
+    return (uint32_t)((distance_mm + 500) / 1000);
+}
+
 /*
  * 返航引导数据接口。
- * 后续 control/return 侧缓存好路线后，提供同名非 weak 函数即可覆盖这里。
+ * ControlTask 每 500ms 更新 return_guide，这里只负责转换成 UI 显示单位。
  */
 __weak int32_t App_UiGetReturnGuidance(const AppSnapshot_t *snapshot, UiReturnGuidance_t *guidance)
 {
+    const ReturnGuideState_t *guide;
+
     if ((snapshot == NULL) || (guidance == NULL))
     {
         return -1;
+    }
+
+    guide = &snapshot->return_guide;
+    if ((guide->valid != 0U) &&
+        (guide->return_mode != 0U) &&
+        (guide->route_valid != 0U))
+    {
+        guidance->valid = 1U;
+        guidance->heading_rad = Ui_CdegToRad(guide->relative_bearing_cdeg);
+        guidance->distance_m = Ui_DistanceMmToMeter(guide->distance_to_next_mm);
+        return 0;
     }
 
     guidance->valid = 0U;

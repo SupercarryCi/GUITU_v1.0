@@ -273,7 +273,7 @@ void LoraNav_DefaultConfig(LoraNavConfig *cfg)
     cfg->snap_distance_m = 3.0f;
     cfg->direction_match_deg = 45.0f;
     cfg->target_arrive_m = 0.5f;
-    cfg->forward_snap_enable = true;
+    cfg->forward_snap_enable = false;
     cfg->return_snap_enable = true;
 }
 

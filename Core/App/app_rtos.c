@@ -224,12 +224,12 @@ static int32_t App_StartRuntimeTasks(void)
     const osThreadAttr_t uiTaskAttr = {
         .name = "UiTask",
         .priority = osPriorityNormal,
-        .stack_size = 2048U
+        .stack_size = 3072U
     };
     const osThreadAttr_t controlTaskAttr = {
         .name = "ControlTask",
         .priority = osPriorityAboveNormal,
-        .stack_size = 512U
+        .stack_size = 2048U
     };
     const osThreadAttr_t loraTaskAttr = {
         .name = "LoraTask",
@@ -254,7 +254,7 @@ static int32_t App_StartRuntimeTasks(void)
     const osThreadAttr_t returnTaskAttr = {
         .name = "ReturnTask",
         .priority = osPriorityAboveNormal,
-        .stack_size = 2048U
+        .stack_size = 512U
     };
     const osThreadAttr_t ins_pdr_TaskAttr = {
         .name = "ins_pdr_Task",
