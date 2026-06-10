@@ -1540,6 +1540,11 @@
               <FileType>5</FileType>
               <FilePath>..\Core\PeripheralDriver\tft_port_stm32_hal.h</FilePath>
             </File>
+            <File>
+              <FileName>compass_icons.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\compass_icon_c\compass_icons.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

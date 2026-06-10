@@ -8,6 +8,10 @@
 #define TFT_LCD_SPI_HANDLE        hspi1
 #endif
 
+#ifndef TFT_LCD_SPI_TIMEOUT_MS
+#define TFT_LCD_SPI_TIMEOUT_MS    200U
+#endif
+
 #ifndef TFT_TOUCH_SPI_HANDLE
 #define TFT_TOUCH_SPI_HANDLE      hspi2
 #endif
@@ -59,7 +63,8 @@ static int tft_lcd_write(void *ctx, const uint8_t *data, size_t len)
     remain = len - offset;
     chunk = (remain > 0xFFFFU) ? 0xFFFFU : (uint16_t)remain;
 
-    if (HAL_SPI_Transmit(spi, (uint8_t *)&data[offset], chunk, HAL_MAX_DELAY) != HAL_OK)
+    /* LCD writes are split into small chunks; finite timeout prevents UI from hanging forever. */
+    if (HAL_SPI_Transmit(spi, (uint8_t *)&data[offset], chunk, TFT_LCD_SPI_TIMEOUT_MS) != HAL_OK)
     {
       return -1;
     }

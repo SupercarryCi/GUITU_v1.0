@@ -7,8 +7,10 @@
 #include "app_state.h"
 #include "cmsis_os.h"
 #include "tft_port_stm32_hal.h"
+#include "../../compass_icon_c/compass_icons.h"
 
 #include <math.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -86,6 +88,23 @@
 #define UI_HOME_TEXT_Y_OFF    28U    //HOME文字y偏移
 #define UI_HOME_ICON_X_OFF    142U   //HOME图标x偏移
 #define UI_HOME_ICON_Y_OFF    50U    //HOME图标y偏移
+#define UI_RETURN_ICON_X      160U
+#define UI_RETURN_ICON_Y      42U
+#define UI_RETURN_ICON_W      COMPASS_ICON_WIDTH
+#define UI_RETURN_ICON_H      COMPASS_ICON_HEIGHT
+#define UI_RETURN_TEXT_X      190U
+#define UI_RETURN_TEXT_Y      230U
+#define UI_RETURN_TEXT_W      210U
+#define UI_RETURN_TEXT_H      48U
+#define UI_RETURN_FRAME_NONE  0xFFU
+
+/* 临时 UI 卡顿定位开关，定位完成后可改为 0U。 */
+#ifndef UI_DIAG_ENABLE
+#define UI_DIAG_ENABLE        0U
+#endif
+#define UI_DIAG_UART_WAIT_MS  5U
+#define UI_DIAG_UART_TX_MS    20U
+#define UI_LCD_GAP_DELAY_MS   1U
 
 typedef enum
 {
@@ -112,6 +131,69 @@ static uint32_t s_lastStatusValue[4];
 static uint16_t s_lastStatusBarW[4];
 static uint32_t s_lastBaseDistanceM = 0U;
 static uint8_t s_lastBaseSignal = 0U;
+static uint8_t s_lastReturnFrame = UI_RETURN_FRAME_NONE;
+static uint32_t s_lastReturnDistanceM = 0xFFFFFFFFU;
+static uint16_t s_returnIconBuffer[COMPASS_ICON_BBOX_MAX_W * COMPASS_ICON_BBOX_MAX_H];
+
+static void Ui_DiagLog(const char *fmt, ...)
+{
+#if (UI_DIAG_ENABLE != 0U)
+    char line[96];
+    va_list args;
+    int len;
+
+    if (fmt == NULL)
+    {
+        return;
+    }
+
+    va_start(args, fmt);
+    len = vsnprintf(line, sizeof(line), fmt, args);
+    va_end(args);
+
+    if (len <= 0)
+    {
+        return;
+    }
+    if (len > ((int)sizeof(line) - 3))
+    {
+        len = (int)sizeof(line) - 3;
+    }
+
+    line[len++] = '\r';
+    line[len++] = '\n';
+    line[len] = '\0';
+
+    if (g_debugUartMutex != NULL)
+    {
+        if (osMutexAcquire(g_debugUartMutex, UI_DIAG_UART_WAIT_MS) != osOK)
+        {
+            return;
+        }
+        (void)HAL_UART_Transmit(&APP_DEBUG_UART_HANDLE,
+                                (uint8_t *)line,
+                                (uint16_t)len,
+                                UI_DIAG_UART_TX_MS);
+        osMutexRelease(g_debugUartMutex);
+    }
+    else
+    {
+        (void)HAL_UART_Transmit(&APP_DEBUG_UART_HANDLE,
+                                (uint8_t *)line,
+                                (uint16_t)len,
+                                UI_DIAG_UART_TX_MS);
+    }
+#else
+    (void)fmt;
+#endif
+}
+static void Ui_LcdGapDelay(void)
+{
+#if (UI_LCD_GAP_DELAY_MS != 0U)
+    /* 给连续 LCD SPI 事务留出实际时间间隔，避免关闭日志后显示链路过紧。 */
+    osDelay(UI_LCD_GAP_DELAY_MS);
+#endif
+}
 
 
 /*将浮点数安全转换为无符号 32 位整数，用于显示*/
@@ -168,6 +250,73 @@ static uint32_t Ui_DistanceMmToMeter(int32_t distance_mm)
     return (uint32_t)((distance_mm + 500) / 1000);
 }
 
+static uint8_t Ui_ReturnHeadingToFrame(float heading_rad)
+{
+    float deg;
+    float step_deg;
+    uint8_t frame_index;
+
+    while (heading_rad < 0.0f)
+    {
+        heading_rad += (2.0f * UI_PI);
+    }
+    while (heading_rad >= (2.0f * UI_PI))
+    {
+        heading_rad -= (2.0f * UI_PI);
+    }
+
+    step_deg = 360.0f / (float)COMPASS_ICON_COUNT;
+    deg = (heading_rad * 180.0f) / UI_PI;
+    frame_index = (uint8_t)((deg + (step_deg * 0.5f)) / step_deg);
+    if (frame_index >= COMPASS_ICON_COUNT)
+    {
+        frame_index = 0U;
+    }
+
+    return (uint8_t)(frame_index + 1U);
+}
+
+static void Ui_DrawCompassIconFrame(uint8_t frame)
+{
+    const Icon_Info *icon;
+    uint32_t total;
+    uint32_t out_idx;
+    uint16_t i;
+
+    icon = CompassIcon_GetFrame(frame);
+    if (icon == NULL)
+    {
+        return;
+    }
+    if ((icon->bbox_w > COMPASS_ICON_BBOX_MAX_W) ||
+        (icon->bbox_h > COMPASS_ICON_BBOX_MAX_H))
+    {
+        return;
+    }
+
+    total = (uint32_t)icon->bbox_w * (uint32_t)icon->bbox_h;
+    out_idx = 0U;
+    for (i = 0U; i < icon->rle_count; i++)
+    {
+        uint16_t j;
+
+        for (j = 0U; (j < icon->rle[i].count) && (out_idx < total); j++)
+        {
+            s_returnIconBuffer[out_idx++] = icon->rle[i].color;
+        }
+    }
+    while (out_idx < total)
+    {
+        s_returnIconBuffer[out_idx++] = ILI9488_COLOR_BLACK;
+    }
+
+    (void)ILI9488_DrawRGB565Image(&g_lcd,
+                                  (uint16_t)(UI_RETURN_ICON_X + icon->bbox_x),
+                                  (uint16_t)(UI_RETURN_ICON_Y + icon->bbox_y),
+                                  icon->bbox_w,
+                                  icon->bbox_h,
+                                  s_returnIconBuffer);
+}
 /*
  * 返航引导数据接口。
  * ControlTask 每 500ms 更新 return_guide，这里只负责转换成 UI 显示单位。
@@ -851,10 +1000,11 @@ static void Ui_DrawQuickView(void)
     Ui_DrawBackCircle();
 }
 
-static void Ui_DrawReturnView(const AppSnapshot_t *snapshot)
+static void Ui_DrawReturnView(const AppSnapshot_t *snapshot, uint8_t full_redraw)
 {
     char text[24];
     UiReturnGuidance_t guidance;
+    uint8_t frame;
 
     memset(&guidance, 0, sizeof(guidance));
     guidance.distance_m = Ui_BaseDistanceMeter(snapshot);
@@ -869,12 +1019,41 @@ static void Ui_DrawReturnView(const AppSnapshot_t *snapshot)
         guidance.heading_rad = 0.0f;
     }
 
-    (void)ILI9488_FillRect(&g_lcd, 120U, 24U, 240U, 180U, ILI9488_COLOR_BLACK);
-    Ui_DrawPaperPlane(240U, 122U, 78U, guidance.heading_rad, ILI9488_COLOR_WHITE);
-    (void)ILI9488_FillRect(&g_lcd, 150U, 222U, 210U, 48U, ILI9488_COLOR_BLACK);
-    (void)snprintf(text, sizeof(text), "%luM", (unsigned long)guidance.distance_m);
-    Ui_DrawText(190U, 230U, text, 3U, ILI9488_COLOR_WHITE);
-    Ui_DrawText(170U, 288U, "TAP TO EXIT", 2U, UI_COLOR_MUTED);
+    frame = Ui_ReturnHeadingToFrame(guidance.heading_rad);
+    if ((full_redraw != 0U) || (frame != s_lastReturnFrame))
+    {
+        (void)ILI9488_FillRect(&g_lcd,
+                               UI_RETURN_ICON_X,
+                               UI_RETURN_ICON_Y,
+                               UI_RETURN_ICON_W,
+                               UI_RETURN_ICON_H,
+                               ILI9488_COLOR_BLACK);
+        Ui_LcdGapDelay();
+        Ui_DiagLog("U I+ f%u", (unsigned int)frame);
+        Ui_DrawCompassIconFrame(frame);
+        Ui_LcdGapDelay();
+        Ui_DiagLog("U I- f%u", (unsigned int)frame);
+        s_lastReturnFrame = frame;
+    }
+
+    if ((full_redraw != 0U) || (guidance.distance_m != s_lastReturnDistanceM))
+    {
+        (void)ILI9488_FillRect(&g_lcd,
+                               150U,
+                               222U,
+                               UI_RETURN_TEXT_W,
+                               UI_RETURN_TEXT_H,
+                               ILI9488_COLOR_BLACK);
+        Ui_LcdGapDelay();
+        (void)snprintf(text, sizeof(text), "%luM", (unsigned long)guidance.distance_m);
+        Ui_DrawText(UI_RETURN_TEXT_X, UI_RETURN_TEXT_Y, text, 3U, ILI9488_COLOR_WHITE);
+        s_lastReturnDistanceM = guidance.distance_m;
+    }
+
+    if (full_redraw != 0U)
+    {
+        Ui_DrawText(170U, 288U, "TAP TO EXIT", 2U, UI_COLOR_MUTED);
+    }
 }
 
 static uint8_t Ui_PointInRect(uint16_t x, uint16_t y, uint16_t rx, uint16_t ry, uint16_t rw, uint16_t rh)
@@ -975,7 +1154,15 @@ void App_UiRender(const AppSnapshot_t *snapshot)
         {
             s_mainValueValid = 0U;
         }
+        else if (s_view == UI_VIEW_RETURN)
+        {
+            s_lastReturnFrame = UI_RETURN_FRAME_NONE;
+            s_lastReturnDistanceM = 0xFFFFFFFFU;
+        }
+        Ui_DiagLog("U F+ v%u", (unsigned int)s_view);
         (void)ILI9488_Fill(&g_lcd, (s_view == UI_VIEW_RETURN) ? ILI9488_COLOR_BLACK : UI_COLOR_BG);
+        Ui_LcdGapDelay();
+        Ui_DiagLog("U F- v%u", (unsigned int)s_view);
     }
 
     if (s_view == UI_VIEW_MAIN)
@@ -991,7 +1178,9 @@ void App_UiRender(const AppSnapshot_t *snapshot)
     }
     else
     {
-        Ui_DrawReturnView(snapshot);
+        Ui_DiagLog("U RV+");
+        Ui_DrawReturnView(snapshot, full_redraw);
+        Ui_DiagLog("U RV-");
     }
 }
 
@@ -1037,9 +1226,18 @@ void Task_UiEntry(void *argument)
     UiState_t ui;
     AppSnapshot_t snapshot;
     uint32_t next_tick;
+    uint32_t loop_count;
+    uint32_t loop_start_tick;
+    uint32_t phase_tick;
+    uint32_t snapshot_ms;
+    uint32_t display_wait_ms;
+    uint32_t display_ms;
+    uint32_t touch_wait_ms;
+    uint32_t touch_ms;
 
     (void)argument;
     memset(&ui, 0, sizeof(ui));
+    loop_count = 0U;
 
     osEventFlagsWait(g_sysEventFlags,
                      SYS_EVT_INIT_DONE,
@@ -1051,19 +1249,41 @@ void Task_UiEntry(void *argument)
     {
         AppCommandMsg_t command;
 
-        memset(&snapshot, 0, sizeof(snapshot));
-        App_StateGetSnapshot(&snapshot);
+        loop_count++;
+        loop_start_tick = osKernelGetTickCount();
+        display_wait_ms = 0xFFFFFFFFU;
+        display_ms = 0xFFFFFFFFU;
+        touch_wait_ms = 0xFFFFFFFFU;
+        touch_ms = 0xFFFFFFFFU;
 
+        memset(&snapshot, 0, sizeof(snapshot));
+        Ui_DiagLog("U%lu S+", (unsigned long)loop_count);
+        phase_tick = osKernelGetTickCount();
+        App_StateGetSnapshot(&snapshot);
+        snapshot_ms = osKernelGetTickCount() - phase_tick;
+        Ui_DiagLog("U%lu S-%lu", (unsigned long)loop_count, (unsigned long)snapshot_ms);
+
+        Ui_DiagLog("U%lu D+", (unsigned long)loop_count);
+        phase_tick = osKernelGetTickCount();
         if (osMutexAcquire(g_spiDisplayMutex, osWaitForever) == osOK)
         {
+            display_wait_ms = osKernelGetTickCount() - phase_tick;
+            Ui_DiagLog("U%lu R+%lu", (unsigned long)loop_count, (unsigned long)display_wait_ms);
+            phase_tick = osKernelGetTickCount();
             App_UiRender(&snapshot);
+            display_ms = osKernelGetTickCount() - phase_tick;
+            Ui_DiagLog("U%lu R-%lu", (unsigned long)loop_count, (unsigned long)display_ms);
             osMutexRelease(g_spiDisplayMutex);
             ui.render_count++;
         }
 
         memset(&command, 0, sizeof(command));
+        Ui_DiagLog("U%lu T+", (unsigned long)loop_count);
+        phase_tick = osKernelGetTickCount();
         if (osMutexAcquire(g_spiTouchMutex, osWaitForever) == osOK)
         {
+            touch_wait_ms = osKernelGetTickCount() - phase_tick;
+            phase_tick = osKernelGetTickCount();
             if (App_UiPollTouch(&command) > 0)
             {
                 if (osMessageQueuePut(g_uiCmdQueue, &command, 0U, 0U) == osOK)
@@ -1074,10 +1294,21 @@ void Task_UiEntry(void *argument)
                     (void)osEventFlagsSet(g_sysEventFlags, SYS_EVT_UI_COMMAND);
                 }
             }
+            touch_ms = osKernelGetTickCount() - phase_tick;
             osMutexRelease(g_spiTouchMutex);
         }
+        Ui_DiagLog("U%lu T-%lu", (unsigned long)loop_count, (unsigned long)touch_ms);
 
         App_StateSetUi(&ui);
+        Ui_DiagLog("U%lu E v%u s%lu dw%lu d%lu tw%lu t%lu a%lu",
+                   (unsigned long)loop_count,
+                   (unsigned int)s_view,
+                   (unsigned long)snapshot_ms,
+                   (unsigned long)display_wait_ms,
+                   (unsigned long)display_ms,
+                   (unsigned long)touch_wait_ms,
+                   (unsigned long)touch_ms,
+                   (unsigned long)(osKernelGetTickCount() - loop_start_tick));
         next_tick += APP_UI_PERIOD_MS;
         osDelayUntil(next_tick);
     }
