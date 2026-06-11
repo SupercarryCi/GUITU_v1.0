@@ -7,7 +7,9 @@
 #include "app_state.h"
 #include "cmsis_os.h"
 #include "tft_port_stm32_hal.h"
+#include "task_debug.h"
 #include "../../compass_icon_c/compass_icons.h"
+#include "../../ui_dashboard_q565.h"
 
 #include <math.h>
 #include <stdarg.h>
@@ -72,6 +74,8 @@
 #define UI_HOME_BTN_H         76U    //主页按钮高度
 #define UI_GAS_BAR_MAX_PPM    50000U //气体浓度条最大值
 #define UI_PI                 3.14159265358979323846f
+#define UI_RAD_TO_DEG          (180.0f / UI_PI)
+#define UI_INS_SWITCH_ATTITUDE_DEG 30.0f
 #define UI_STATUS_ICON_SIZE   48U
 #define UI_STATUS_VALUE_X_OFF 70U    //状态栏数值x偏移
 #define UI_STATUS_VALUE_Y_OFF 36U    //状态栏数值y偏移
@@ -102,9 +106,9 @@
 #ifndef UI_DIAG_ENABLE
 #define UI_DIAG_ENABLE        0U
 #endif
-#define UI_DIAG_UART_WAIT_MS  5U
-#define UI_DIAG_UART_TX_MS    20U
 #define UI_LCD_GAP_DELAY_MS   1U
+#define UI_DASHBOARD_CHUNK_ROWS 8U
+#define UI_DASHBOARD_CHUNK_PIXELS (UI_DASHBOARD_WIDTH * UI_DASHBOARD_CHUNK_ROWS)
 
 typedef enum
 {
@@ -134,6 +138,8 @@ static uint8_t s_lastBaseSignal = 0U;
 static uint8_t s_lastReturnFrame = UI_RETURN_FRAME_NONE;
 static uint32_t s_lastReturnDistanceM = 0xFFFFFFFFU;
 static uint16_t s_returnIconBuffer[COMPASS_ICON_BBOX_MAX_W * COMPASS_ICON_BBOX_MAX_H];
+static uint16_t s_dashboardDecodeBuffer[UI_DASHBOARD_CHUNK_PIXELS];
+static uint8_t s_mainBackgroundValid = 0U;
 
 static void Ui_DiagLog(const char *fmt, ...)
 {
@@ -155,34 +161,13 @@ static void Ui_DiagLog(const char *fmt, ...)
     {
         return;
     }
-    if (len > ((int)sizeof(line) - 3))
+    if (len >= (int)sizeof(line))
     {
-        len = (int)sizeof(line) - 3;
+        line[sizeof(line) - 1U] = '\0';
     }
 
-    line[len++] = '\r';
-    line[len++] = '\n';
-    line[len] = '\0';
-
-    if (g_debugUartMutex != NULL)
-    {
-        if (osMutexAcquire(g_debugUartMutex, UI_DIAG_UART_WAIT_MS) != osOK)
-        {
-            return;
-        }
-        (void)HAL_UART_Transmit(&APP_DEBUG_UART_HANDLE,
-                                (uint8_t *)line,
-                                (uint16_t)len,
-                                UI_DIAG_UART_TX_MS);
-        osMutexRelease(g_debugUartMutex);
-    }
-    else
-    {
-        (void)HAL_UART_Transmit(&APP_DEBUG_UART_HANDLE,
-                                (uint8_t *)line,
-                                (uint16_t)len,
-                                UI_DIAG_UART_TX_MS);
-    }
+    /* UI诊断统一走 DebugTask，避免任务里直接抢调试串口。 */
+    App_DebugLog("%s", line);
 #else
     (void)fmt;
 #endif
@@ -193,6 +178,155 @@ static void Ui_LcdGapDelay(void)
     /* 给连续 LCD SPI 事务留出实际时间间隔，避免关闭日志后显示链路过紧。 */
     osDelay(UI_LCD_GAP_DELAY_MS);
 #endif
+}
+static int32_t Ui_DashboardFlushBuffer(uint32_t pixel_count, uint32_t *next_y)
+{
+    uint32_t rows;
+
+    if ((pixel_count == 0U) || (next_y == NULL))
+    {
+        return 0;
+    }
+    if ((pixel_count % UI_DASHBOARD_WIDTH) != 0U)
+    {
+        return -1;
+    }
+
+    rows = pixel_count / UI_DASHBOARD_WIDTH;
+    if (ILI9488_DrawRGB565Image(&g_lcd,
+                                0U,
+                                (uint16_t)(*next_y),
+                                (uint16_t)UI_DASHBOARD_WIDTH,
+                                (uint16_t)rows,
+                                s_dashboardDecodeBuffer) != 0)
+    {
+        return -1;
+    }
+
+    *next_y += rows;
+    Ui_LcdGapDelay();
+    return 0;
+}
+
+static int32_t Ui_DashboardPushPixel(uint16_t px, uint32_t *buffer_count, uint32_t *next_y)
+{
+    if ((buffer_count == NULL) || (next_y == NULL))
+    {
+        return -1;
+    }
+
+    s_dashboardDecodeBuffer[*buffer_count] = px;
+    (*buffer_count)++;
+    if (*buffer_count >= UI_DASHBOARD_CHUNK_PIXELS)
+    {
+        if (Ui_DashboardFlushBuffer(*buffer_count, next_y) != 0)
+        {
+            return -1;
+        }
+        *buffer_count = 0U;
+    }
+
+    return 0;
+}
+
+static int32_t Ui_DrawDashboardBackground(void)
+{
+    uint16_t cache[64] = {0};
+    uint16_t prev = 0U;
+    uint32_t src_index = 0U;
+    uint32_t out_pixels = 0U;
+    uint32_t buffer_count = 0U;
+    uint32_t next_y = 0U;
+
+    while (out_pixels < UI_DASHBOARD_PIXELS)
+    {
+        uint8_t op;
+
+        if (src_index >= ui_dashboard_q565_size)
+        {
+            return -1;
+        }
+        op = ui_dashboard_q565[src_index++];
+
+        if (op < 0x40U)
+        {
+            prev = cache[op & 0x3FU];
+            if (Ui_DashboardPushPixel(prev, &buffer_count, &next_y) != 0)
+            {
+                return -1;
+            }
+            out_pixels++;
+        }
+        else if (op < 0x80U)
+        {
+            uint32_t run = (uint32_t)(op & 0x3FU) + 1U;
+            if ((out_pixels + run) > UI_DASHBOARD_PIXELS)
+            {
+                return -1;
+            }
+            while (run > 0U)
+            {
+                if (Ui_DashboardPushPixel(prev, &buffer_count, &next_y) != 0)
+                {
+                    return -1;
+                }
+                out_pixels++;
+                run--;
+            }
+        }
+        else if (op < 0xC0U)
+        {
+            int r = (int)((prev >> 11) & 0x1FU);
+            int g = (int)((prev >> 5) & 0x3FU);
+            int b = (int)(prev & 0x1FU);
+
+            r += (int)((op >> 4) & 0x03U) - 2;
+            g += (int)((op >> 2) & 0x03U) - 2;
+            b += (int)(op & 0x03U) - 2;
+            if ((r < 0) || (r > 31) || (g < 0) || (g > 63) || (b < 0) || (b > 31))
+            {
+                return -1;
+            }
+
+            prev = (uint16_t)(((uint16_t)r << 11) | ((uint16_t)g << 5) | (uint16_t)b);
+            cache[q565_hash_u16(prev)] = prev;
+            if (Ui_DashboardPushPixel(prev, &buffer_count, &next_y) != 0)
+            {
+                return -1;
+            }
+            out_pixels++;
+        }
+        else if (op == 0xFEU)
+        {
+            if ((src_index + 1U) >= ui_dashboard_q565_size)
+            {
+                return -1;
+            }
+            prev = (uint16_t)((uint16_t)ui_dashboard_q565[src_index] |
+                              ((uint16_t)ui_dashboard_q565[src_index + 1U] << 8));
+            src_index += 2U;
+            cache[q565_hash_u16(prev)] = prev;
+            if (Ui_DashboardPushPixel(prev, &buffer_count, &next_y) != 0)
+            {
+                return -1;
+            }
+            out_pixels++;
+        }
+        else
+        {
+            return -1;
+        }
+    }
+
+    if (buffer_count != 0U)
+    {
+        if (Ui_DashboardFlushBuffer(buffer_count, &next_y) != 0)
+        {
+            return -1;
+        }
+    }
+
+    return (next_y == UI_DASHBOARD_HEIGHT) ? 0 : -1;
 }
 
 
@@ -238,6 +372,23 @@ static uint32_t Ui_BaseDistanceMeter(const AppSnapshot_t *snapshot)
 static float Ui_CdegToRad(int16_t cdeg)
 {
     return ((float)cdeg * UI_PI) / 18000.0f;
+}
+static uint8_t Ui_IsHandRaisedForIns(const AppSnapshot_t *snapshot)
+{
+    float roll_deg;
+    float pitch_deg;
+
+    if ((snapshot == NULL) || (snapshot->nav.update_count == 0U))
+    {
+        return 0U;
+    }
+
+    roll_deg = fabsf(snapshot->nav.data.attitude_rad[0] * UI_RAD_TO_DEG);
+    pitch_deg = fabsf(snapshot->nav.data.attitude_rad[1] * UI_RAD_TO_DEG);
+
+    /* 复用 INS/PDR 切换条件：roll/pitch 都小于30度时视为抬手。 */
+    return ((roll_deg < UI_INS_SWITCH_ATTITUDE_DEG) &&
+            (pitch_deg < UI_INS_SWITCH_ATTITUDE_DEG)) ? 1U : 0U;
 }
 
 static uint32_t Ui_DistanceMmToMeter(int32_t distance_mm)
@@ -337,6 +488,11 @@ __weak int32_t App_UiGetReturnGuidance(const AppSnapshot_t *snapshot, UiReturnGu
     {
         guidance->valid = 1U;
         guidance->heading_rad = Ui_CdegToRad(guide->relative_bearing_cdeg);
+        if (Ui_IsHandRaisedForIns(snapshot) != 0U)
+        {
+            /* 抬手时设备+x变为行人正方向，返航UI箭头需要反向显示。 */
+            guidance->heading_rad += UI_PI;
+        }
         guidance->distance_m = Ui_DistanceMmToMeter(guide->distance_to_next_mm);
         return 0;
     }
@@ -959,18 +1115,26 @@ static void Ui_DrawMainView(const AppSnapshot_t *snapshot, uint8_t full_redraw)
 
     if (full_redraw != 0U)
     {
-        y = 10U;
-        Ui_DrawStatusCardStatic(y, "NGAS", 0U, UI_COLOR_NGAS);
-        y = (uint16_t)(y + UI_CARD_H + UI_CARD_GAP);
-        Ui_DrawStatusCardStatic(y, "LPG", 1U, UI_COLOR_LPG);
-        y = (uint16_t)(y + UI_CARD_H + UI_CARD_GAP);
-        Ui_DrawStatusCardStatic(y, "HR", 2U, UI_COLOR_HR);
-        y = (uint16_t)(y + UI_CARD_H + UI_CARD_GAP);
-        Ui_DrawStatusCardStatic(y, "SPO2", 3U, UI_COLOR_SPO2);
+        if (s_mainBackgroundValid == 0U)
+        {
+            s_mainBackgroundValid = (Ui_DrawDashboardBackground() == 0) ? 1U : 0U;
+        }
 
-        (void)ILI9488_FillRect(&g_lcd, UI_RIGHT_X, 8U, UI_RIGHT_W, 312U, UI_COLOR_BG);
-        Ui_DrawQuickCircleStatic();
-        Ui_DrawReturnButton();
+        if (s_mainBackgroundValid == 0U)
+        {
+            y = 10U;
+            Ui_DrawStatusCardStatic(y, "NGAS", 0U, UI_COLOR_NGAS);
+            y = (uint16_t)(y + UI_CARD_H + UI_CARD_GAP);
+            Ui_DrawStatusCardStatic(y, "LPG", 1U, UI_COLOR_LPG);
+            y = (uint16_t)(y + UI_CARD_H + UI_CARD_GAP);
+            Ui_DrawStatusCardStatic(y, "HR", 2U, UI_COLOR_HR);
+            y = (uint16_t)(y + UI_CARD_H + UI_CARD_GAP);
+            Ui_DrawStatusCardStatic(y, "SPO2", 3U, UI_COLOR_SPO2);
+
+            (void)ILI9488_FillRect(&g_lcd, UI_RIGHT_X, 8U, UI_RIGHT_W, 312U, UI_COLOR_BG);
+            Ui_DrawQuickCircleStatic();
+            Ui_DrawReturnButton();
+        }
     }
 
     y = 10U;
@@ -1132,7 +1296,15 @@ int32_t App_UiHardwareInit(void)
         return -1;
     }
 
-    (void)ILI9488_Fill(&g_lcd, UI_COLOR_BG);
+    if (Ui_DrawDashboardBackground() == 0)
+    {
+        s_mainBackgroundValid = 1U;
+    }
+    else
+    {
+        s_mainBackgroundValid = 0U;
+        (void)ILI9488_Fill(&g_lcd, UI_COLOR_BG);
+    }
     return 0;
 }
 
@@ -1160,8 +1332,12 @@ void App_UiRender(const AppSnapshot_t *snapshot)
             s_lastReturnDistanceM = 0xFFFFFFFFU;
         }
         Ui_DiagLog("U F+ v%u", (unsigned int)s_view);
-        (void)ILI9488_Fill(&g_lcd, (s_view == UI_VIEW_RETURN) ? ILI9488_COLOR_BLACK : UI_COLOR_BG);
-        Ui_LcdGapDelay();
+        if (s_view != UI_VIEW_MAIN)
+        {
+            s_mainBackgroundValid = 0U;
+            (void)ILI9488_Fill(&g_lcd, (s_view == UI_VIEW_RETURN) ? ILI9488_COLOR_BLACK : UI_COLOR_BG);
+            Ui_LcdGapDelay();
+        }
         Ui_DiagLog("U F- v%u", (unsigned int)s_view);
     }
 

@@ -16,6 +16,10 @@
 #define TFT_TOUCH_SPI_HANDLE      hspi2
 #endif
 
+#ifndef TFT_TOUCH_SPI_TIMEOUT_MS
+#define TFT_TOUCH_SPI_TIMEOUT_MS  200U
+#endif
+
 #ifndef TFT_LCD_CS_GPIO_Port
 #define TFT_LCD_CS_GPIO_Port      SPI1_CS_GPIO_Port
 #define TFT_LCD_CS_Pin            SPI1_CS_Pin
@@ -118,7 +122,8 @@ static int tft_touch_transfer(void *ctx, const uint8_t *tx, uint8_t *rx, size_t 
     remain = len - offset;
     chunk = (remain > 0xFFFFU) ? 0xFFFFU : (uint16_t)remain;
 
-    if (HAL_SPI_TransmitReceive(spi, (uint8_t *)&tx[offset], &rx[offset], chunk, HAL_MAX_DELAY) != HAL_OK)
+    /* Touch reads also use a finite timeout so UI cannot block forever on SPI2. */
+    if (HAL_SPI_TransmitReceive(spi, (uint8_t *)&tx[offset], &rx[offset], chunk, TFT_TOUCH_SPI_TIMEOUT_MS) != HAL_OK)
     {
       return -1;
     }

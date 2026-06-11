@@ -17,6 +17,11 @@ except ImportError:
     serial = None
     list_ports = None
 
+try:
+    from c_nav_bridge import CNavEngine
+except (ImportError, OSError):
+    CNavEngine = None
+
 
 DATA_RE = re.compile(r"^\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)")
 RETURN_RE = re.compile(r"^\s*R\s*(?:\[.*\])?\s*$", re.IGNORECASE)
@@ -106,6 +111,8 @@ class LoraMapViewer:
         self.stop_event = None
         self.last_line = ""
         self.status_var = tk.StringVar(value="空闲")
+        self.c_engine = None
+        self.c_debug = {}
 
         self.port_var = tk.StringVar(value="COM3")
         self.baud_var = tk.StringVar(value=DEFAULT_BAUD)
@@ -124,6 +131,7 @@ class LoraMapViewer:
         self.direction_bias_move_threshold_var = tk.StringVar(value=DEFAULT_DIRECTION_BIAS_MOVE_THRESHOLD_M)
         self.forward_snap_var = tk.BooleanVar(value=True)
         self.return_snap_var = tk.BooleanVar(value=True)
+        self.c_engine_var = tk.BooleanVar(value=False)
         self.mirror_display_var = tk.BooleanVar(value=True)
         self.snap_distance_var = tk.StringVar(value=DEFAULT_SNAP_DISTANCE_M)
         self.direction_match_var = tk.StringVar(value=DEFAULT_DIRECTION_MATCH_DEG)
@@ -216,6 +224,7 @@ class LoraMapViewer:
 
         ttk.Button(map_action_row, text="应用参数", command=self.update_map_from_ui).pack(side=tk.LEFT, padx=(0, 4))
         ttk.Button(map_action_row, text="返航路线", command=self.plan_return_route).pack(side=tk.LEFT, padx=4)
+        ttk.Checkbutton(map_action_row, text="C算法", variable=self.c_engine_var, command=self.toggle_c_engine).pack(side=tk.LEFT, padx=(12, 4))
         ttk.Checkbutton(map_action_row, text="镜像显示", variable=self.mirror_display_var, command=self.draw_map).pack(side=tk.LEFT, padx=(12, 4))
 
         file_row = ttk.Frame(top)
@@ -327,8 +336,93 @@ class LoraMapViewer:
         self.snap_segment_index = 0
         self.return_route = []
         self.last_line = ""
+        self._reset_c_engine(show_error=False)
         self.status_var.set("空闲")
         self.draw_map()
+
+    def toggle_c_engine(self):
+        if self.c_engine_var.get():
+            if not self._initialize_c_engine(show_error=True):
+                self.c_engine_var.set(False)
+                return
+            self.clear_points()
+            self.status_var.set("C算法已启用，地图已清空")
+        else:
+            self.c_engine = None
+            self.c_debug = {}
+            self.clear_points()
+            self.status_var.set("Python算法已启用，地图已清空")
+
+    def _initialize_c_engine(self, show_error):
+        params = self._read_map_params(show_error=show_error)
+        snap_params = self._read_snap_params(show_error=show_error)
+        if params is None or snap_params is None:
+            return False
+        if CNavEngine is None:
+            if show_error:
+                messagebox.showerror("C算法不可用", "无法加载 c_nav_bridge.py。")
+            return False
+
+        turn_angle_deg, min_segment_m, merge_distance_m, _point_limit = params
+        snap_distance_m, direction_match_deg = snap_params
+        try:
+            engine = CNavEngine()
+            status = engine.initialize(
+                turn_angle_deg,
+                min_segment_m,
+                merge_distance_m,
+                snap_distance_m,
+                direction_match_deg,
+                self.forward_snap_var.get(),
+                self.return_snap_var.get(),
+            )
+        except (OSError, AttributeError) as exc:
+            if show_error:
+                messagebox.showerror("C算法不可用", "加载 dijkstra.dll 失败:\n%s" % exc)
+            return False
+
+        if status != 0:
+            if show_error:
+                messagebox.showerror("C算法初始化失败", "状态码: %d" % status)
+            return False
+
+        self.c_engine = engine
+        self.c_debug = engine.debug()
+        return True
+
+    def _reset_c_engine(self, show_error):
+        if not self.c_engine_var.get():
+            self.c_engine = None
+            self.c_debug = {}
+            return True
+        return self._initialize_c_engine(show_error=show_error)
+
+    def _sync_c_map_state(self):
+        if self.c_engine is None:
+            return
+
+        self.c_debug = self.c_engine.debug()
+        self.graph_nodes = self.c_engine.nodes()
+        self.graph_edges = {}
+        for node_a, node_b in self.c_engine.edges():
+            if node_a < 0 or node_b < 0 or node_a >= len(self.graph_nodes) or node_b >= len(self.graph_nodes):
+                continue
+            weight = self._distance_xy(self.graph_nodes[node_a], self.graph_nodes[node_b])
+            self._add_edge(self.graph_edges, node_a, node_b, weight)
+
+        key_count = min(self.c_debug.get("key_count", 0), len(self.graph_nodes))
+        self.key_points = [
+            (x_m, y_m, 0.0, 0.0)
+            for x_m, y_m in self.graph_nodes[:key_count]
+        ]
+        self.key_node_ids = list(range(key_count))
+
+        home_id = self.c_debug.get("home_node_id", -1)
+        last_key_id = self.c_debug.get("last_key_node_id", -1)
+        self.home_node_id = home_id if 0 <= home_id < len(self.graph_nodes) else None
+        self.last_key_node_id = last_key_id if 0 <= last_key_id < len(self.graph_nodes) else None
+        self.return_route = self.c_engine.route()
+        self.snap_route_points = list(self.return_route)
 
     def process_queue(self):
         while True:
@@ -462,6 +556,7 @@ class LoraMapViewer:
         self.snap_segment_index = 0
         self.return_route = []
         self.last_line = ""
+        self._reset_c_engine(show_error=False)
 
     def _schedule_file_step(self):
         try:
@@ -492,21 +587,40 @@ class LoraMapViewer:
             _kind, _point, line = entry
             self.file_return_mode = True
             self.last_line = line
-            if self.file_navigation_var.get() and self.home_node_id is not None and self.graph_nodes:
+            if self.c_engine_var.get() and self.c_engine is not None:
+                if self.file_navigation_var.get():
+                    result = self.c_engine.enter_return()
+                    self._sync_c_map_state()
+                    self.status_var.set("C返航: %s  路线点: %d" % (result["status_name"], len(self.return_route)))
+                else:
+                    self.return_route = []
+            elif self.file_navigation_var.get() and self.home_node_id is not None and self.graph_nodes:
                 self._start_return_navigation()
             else:
                 self.return_route = []
-            self.status_var.set("检测到返航包: %d/%d" % (self.file_index, len(self.file_entries)))
+            if not self.c_engine_var.get():
+                self.status_var.set("检测到返航包: %d/%d" % (self.file_index, len(self.file_entries)))
             self.draw_map()
             return True
 
         _kind, point, line, mode = entry
         build_map = mode == "forward" and self.file_build_map_var.get()
         update_navigation = mode == "return" and self.file_navigation_var.get()
-        self.add_point(point, line, mode=mode, build_map=build_map, update_navigation=update_navigation)
+        self.add_point(
+            point,
+            line,
+            mode=mode,
+            build_map=build_map,
+            update_navigation=update_navigation,
+            from_file=True,
+        )
         return True
 
-    def add_point(self, point, line, mode="forward", build_map=True, update_navigation=False):
+    def add_point(self, point, line, mode="forward", build_map=True, update_navigation=False, from_file=False):
+        if self.c_engine_var.get():
+            self._add_point_with_c_engine(point, line, mode, build_map, update_navigation, from_file)
+            return
+
         point = self._apply_source_correction(point)
         params = self._read_map_params(show_error=False)
         self.trace_points.append((point, mode))
@@ -550,6 +664,63 @@ class LoraMapViewer:
             ))
         self.draw_map()
 
+    def _add_point_with_c_engine(self, point, line, mode, build_map, update_navigation, from_file):
+        if self.c_engine is None and not self._initialize_c_engine(show_error=False):
+            self.status_var.set("C算法不可用，请重新启用C算法")
+            return
+
+        debug_before = self.c_engine.debug()
+        effective_mode = "return" if debug_before.get("return_mode", 0) else mode
+        self.trace_points.append((point, effective_mode))
+        if effective_mode == "forward":
+            self.forward_raw_points.append(point)
+        else:
+            self.return_raw_points.append(point)
+
+        should_process = True
+        if from_file:
+            should_process = (
+                (effective_mode == "forward" and build_map)
+                or (effective_mode == "return" and update_navigation)
+            )
+
+        corrected_point = point
+        result = None
+        if should_process:
+            result = self.c_engine.input_point(point)
+            corrected_point = result["corrected_point"]
+            self._sync_c_map_state()
+
+        if effective_mode == "forward":
+            self.forward_snap_points.append(corrected_point)
+            if self._distance_2d(point, corrected_point) > 1e-6:
+                self.forward_snap_changed_count += 1
+        elif self.return_snap_var.get():
+            self.return_snap_points.append(corrected_point)
+
+        self.points.append(corrected_point)
+        self.total_point_count += 1
+        self.last_line = line
+        params = self._read_map_params(show_error=False)
+        if params is not None:
+            self._trim_points(params[3])
+
+        if result is None:
+            self.status_var.set("C算法未处理此点: 文件建图或导航未开启")
+        else:
+            last_us = self.c_debug.get("last_process_us", 0)
+            max_us = self.c_debug.get("max_process_us", 0)
+            checked_edges = self.c_debug.get("checked_edge_count", 0)
+            self.status_var.set(
+                "C算法: %s  耗时: %dus  最大: %dus  检查边: %d" % (
+                    result["status_name"],
+                    last_us,
+                    max_us,
+                    checked_edges,
+                )
+            )
+        self.draw_map()
+
     def update_manual_cursor(self):
         cursor = "crosshair" if self.manual_mode_var.get() else ""
         self.canvas.configure(cursor=cursor)
@@ -574,6 +745,13 @@ class LoraMapViewer:
         params = self._read_map_params(show_error=True)
         if params is None:
             return
+        if self.c_engine_var.get():
+            if not self._initialize_c_engine(show_error=True):
+                return
+            self.clear_points()
+            self.status_var.set("C算法参数已应用，地图已清空")
+            return
+
         _turn_angle_deg, _min_segment_m, _merge_distance_m, point_limit = params
         self._trim_points(point_limit)
         self.return_route = []
@@ -1410,6 +1588,25 @@ class LoraMapViewer:
             messagebox.showinfo("返航路线", "还没有位置点。")
             return
 
+        if self.c_engine_var.get():
+            if self.c_engine is None and not self._initialize_c_engine(show_error=True):
+                return
+            result = self.c_engine.enter_return()
+            self.file_return_mode = True
+            self._sync_c_map_state()
+            if result["route_valid"]:
+                self.status_var.set(
+                    "C返航路线: 下一关键点 %.2fm  路线点: %d" % (
+                        result["distance_to_next_m"],
+                        len(self.return_route),
+                    )
+                )
+            else:
+                self.status_var.set("C返航路线: %s" % result["status_name"])
+                messagebox.showwarning("返航路线", "C算法未找到到起点的路线。")
+            self.draw_map()
+            return
+
         params = self._read_map_params(show_error=True)
         if params is None:
             return
@@ -1806,6 +2003,21 @@ class LoraMapViewer:
             fill="#52616b",
             font=CANVAS_TEXT_FONT,
         )
+        if self.c_engine_var.get():
+            canvas.create_text(
+                pad,
+                pad + 182,
+                text="C算法耗时: %dus   最大: %dus   检查边: %d   交点: %d   合并: %d" % (
+                    self.c_debug.get("last_process_us", 0),
+                    self.c_debug.get("max_process_us", 0),
+                    self.c_debug.get("checked_edge_count", 0),
+                    self.c_debug.get("intersection_count", 0),
+                    self.c_debug.get("merged_node_count", 0),
+                ),
+                anchor=tk.NW,
+                fill="#7b1fa2",
+                font=CANVAS_TEXT_FONT,
+            )
 
     def close(self):
         self.disconnect()

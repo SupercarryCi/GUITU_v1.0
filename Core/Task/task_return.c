@@ -15,14 +15,18 @@
  * 返航任务默认不运行。
  * UI 发开始命令后进入 RUNNING，再次点击 HOME 后回到 IDLE。
  */
-/* 待你完善：返航开始时装载已记录路径、选择起始目标点、初始化控制参数。 */
+
+ 
+/*
+ *废案，大概是不会用了，地图相关的放在control里面了
+ *目前的工作是接一下返航标志位，往lora队列投个R
+ */
 __weak int32_t App_ReturnOnStart(ReturnState_t *state)
 {
     (void)state;
     return 0;
 }
 
-/* 待你完善：后续如果需要独立返航控制输出，可以重新接入这个弱函数。 */
 __weak int32_t App_ReturnStep(const AppSnapshot_t *snapshot, ReturnState_t *state)
 {
     (void)snapshot;
@@ -30,7 +34,6 @@ __weak int32_t App_ReturnStep(const AppSnapshot_t *snapshot, ReturnState_t *stat
     return 0;
 }
 
-/* 待你完善：返航停止时关闭控制输出、清理临时路径/控制状态。 */
 __weak void App_ReturnOnStop(ReturnState_t *state)
 {
     (void)state;

@@ -142,6 +142,10 @@ typedef struct
     int16_t dijkstra_prev[LORA_NAV_MAX_NODES];
     bool dijkstra_used[LORA_NAV_MAX_NODES];
     LoraNavSegmentPoint scratch_points[LORA_NAV_MAX_NODES];
+
+    uint32_t debug_checked_edge_count;
+    uint32_t debug_intersection_count;
+    uint32_t debug_merged_node_count;
 } LoraNavContext;
 
 static float nav_absf(float value)
@@ -683,6 +687,10 @@ static void nav_cluster_intersection_area(LoraNavContext *ctx, uint16_t center_i
     {
         if (nav_distance_point(&ctx->nodes[i], &center) <= ctx->cfg.merge_distance_m)
         {
+            if (i != center_id)
+            {
+                ctx->debug_merged_node_count++;
+            }
             ctx->nodes[i] = center;
             if (i != center_id)
             {
@@ -747,6 +755,7 @@ static LoraNavStatus nav_add_incremental_segment(LoraNavContext *ctx, uint16_t a
             {
                 continue;
             }
+            ctx->debug_checked_edge_count++;
             if (a_id == c || a_id == d || b_id == c || b_id == d)
             {
                 continue;
@@ -757,6 +766,7 @@ static LoraNavStatus nav_add_incremental_segment(LoraNavContext *ctx, uint16_t a
             {
                 continue;
             }
+            ctx->debug_intersection_count++;
 
             node_id = nav_intersection_node_id(ctx, a_id, b_id, pos_new,
                                                c, d, pos_old, x_m, y_m, &ok);
@@ -1361,6 +1371,10 @@ LoraNavStatus LoraNav_ProcessPoint(LoraNavContext *ctx, const LoraNavPoint *raw_
     {
         return LORA_NAV_BAD_ARG;
     }
+
+    ctx->debug_checked_edge_count = 0u;
+    ctx->debug_intersection_count = 0u;
+    ctx->debug_merged_node_count = 0u;
 
     point = *raw_point;
 

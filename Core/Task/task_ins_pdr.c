@@ -13,17 +13,20 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-#define INS_PDR_DT_S 0.005f   /* 陀螺仪频率200Hz */
-#define INS_PDR_ENABLE_LOGIC 1U /* 0: 暂时保留接口，禁用未完成的 INS/PDR 逻辑 */
-#define INS_PDR_ENABLE_INS 0U /* 0: 先禁用INS，只输出PDR判步位移 */
-#define INS_PDR_ENABLE_HEADING_DIAG 1U
-#define INS_PDR_HEADING_DIAG_PERIOD_MS 200U
+#define INS_PDR_DT_S 0.005f                     /* 陀螺仪频率200Hz */
+#define INS_PDR_ENABLE_LOGIC 1U                 /* 0: 暂时保留接口，禁用未完成的 INS/PDR 逻辑 */
+#define INS_PDR_ENABLE_INS 0U                   /* 0: 先禁用INS，只输出PDR判步位移 */
+
+#define INS_PDR_ENABLE_HEADING_DIAG 1U          /* 航向诊断日志*/
+#define INS_PDR_HEADING_DIAG_PERIOD_MS 200U     
 #define INS_PDR_DIAG_LINE_LEN 64U
-#define INS_PDR_HEADING_UPDATE_PERIOD_MS 50U /* 未判步时也定期刷新行人航向，避免LoRa角度停住。 */
-#define INS_PDR_HEADING_OFFSET_DEG (-18.50f) /* 安装偏差：139.00度修正到120.50度 */
-#define INS_PDR_ENABLE_HEADING_SNAP 0U       /* 临时功能：1=四向吸附，0=关闭 */
-#define INS_PDR_HEADING_SNAP_DEG 45.0f       /* 小于该偏差时吸附到0/90/-90/-180度 */
-#define INS_PDR_HEADING_SNAP_CONFIRM_COUNT 2U /* 新吸附方向连续出现2次才切换 */
+
+#define INS_PDR_HEADING_UPDATE_PERIOD_MS 50U    /* 未判步时也定期刷新行人航向，避免LoRa角度停住。 */
+#define INS_PDR_HEADING_OFFSET_DEG (-18.50f)    /* 手臂佩戴偏差：例如139.00度修正到120.50度 */
+
+#define INS_PDR_ENABLE_HEADING_SNAP 0U          /* 临时测试功能：1=四向吸附，0=关闭 */
+#define INS_PDR_HEADING_SNAP_DEG 45.0f          /* 小于该偏差时吸附到0/90/-90/-180度 */
+#define INS_PDR_HEADING_SNAP_CONFIRM_COUNT 2U   /* 新吸附方向连续出现2次才切换 */
 
 #if (INS_PDR_ENABLE_LOGIC != 0U)
 static PdrStepDetector s_pdr_det;
@@ -368,7 +371,7 @@ void Task_Ins_Pdr_Entry(void *argument)
                 send_nav_delta = 1U;
             }
 #else
-            /* INS暂时禁用：PDR没有判到步时不向Control队列投递零位移包。 */
+            /* INS暂时禁用：PDR没有判到步时不向Control队列投递零位移包。按理上正常投递不会有问题，但他就是出现了 */
             if (pdr_out.step_detected != 0U)
             {
                 (void)PFT_StepDistanceToPedDelta(pdr_out.delta_distance_m,

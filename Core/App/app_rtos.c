@@ -219,7 +219,7 @@ static int32_t App_StartRuntimeTasks(void)
     const osThreadAttr_t gyroTaskAttr = {
         .name = "GyroTask",
         .priority = osPriorityHigh,
-        .stack_size = 512U
+        .stack_size = 1024U
     };
     const osThreadAttr_t uiTaskAttr = {
         .name = "UiTask",
