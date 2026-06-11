@@ -110,6 +110,64 @@
 #define UI_DASHBOARD_CHUNK_ROWS 8U
 #define UI_DASHBOARD_CHUNK_PIXELS (UI_DASHBOARD_WIDTH * UI_DASHBOARD_CHUNK_ROWS)
 
+#define UI_MAIN_TOP_VALUE_BG       0x0000U
+#define UI_MAIN_TOP_TEXT_X_SCALE   2U
+#define UI_MAIN_TOP_TEXT_Y_SCALE   2U
+#define UI_MAIN_SIGNAL_VALUE_X     90U
+#define UI_MAIN_SIGNAL_VALUE_Y     11U
+#define UI_MAIN_SIGNAL_VALUE_W     90U
+#define UI_MAIN_SIGNAL_VALUE_H     14U
+#define UI_MAIN_CPU_VALUE_X        244U
+#define UI_MAIN_CPU_VALUE_Y        11U
+#define UI_MAIN_CPU_VALUE_W        40U
+#define UI_MAIN_CPU_VALUE_H        14U
+#define UI_MAIN_CPU_VALUE_BG       0x0000U
+#define UI_MAIN_RAM_VALUE_X        416U
+#define UI_MAIN_RAM_VALUE_Y        11U
+#define UI_MAIN_RAM_VALUE_W        40U
+#define UI_MAIN_RAM_VALUE_H        14U
+#define UI_MAIN_RAM_VALUE_BG       0x0000U
+
+#define UI_MAIN_CARD_ICON_X        18U
+#define UI_MAIN_CARD_ICON_Y        12U
+#define UI_MAIN_CARD_LABEL_X       78U
+#define UI_MAIN_CARD_LABEL_Y       12U
+#define UI_MAIN_CARD_UNIT_X        160U
+#define UI_MAIN_CARD_UNIT_Y        40U
+#define UI_MAIN_CARD_UNIT_X_SCALE  2U
+#define UI_MAIN_CARD_UNIT_Y_SCALE  2U
+#define UI_MAIN_CARD_VALUE_X_SCALE 3U
+#define UI_MAIN_CARD_VALUE_Y_SCALE 3U
+#define UI_MAIN_CARD_VALUE_X       78U
+#define UI_MAIN_CARD_VALUE_Y       30U
+#define UI_MAIN_CARD_VALUE_W       110U
+#define UI_MAIN_CARD_VALUE_H       30U
+#define UI_MAIN_CARD0_VALUE_BG     0x0860U
+#define UI_MAIN_CARD1_VALUE_BG     0x0041U
+#define UI_MAIN_CARD2_VALUE_BG     0x0021U
+#define UI_MAIN_CARD3_VALUE_BG     0x0042U
+
+#define UI_MAIN_BASE_INFO_BG       0x010CU
+#define UI_MAIN_BASE_DIST_X_SCALE  3U
+#define UI_MAIN_BASE_DIST_Y_SCALE  3U
+#define UI_MAIN_BASE_DIST_X        258U
+#define UI_MAIN_BASE_DIST_Y        128U
+#define UI_MAIN_BASE_DIST_W        128U
+#define UI_MAIN_BASE_DIST_H        24U
+
+#define UI_MAIN_BASE_X             228U
+#define UI_MAIN_BASE_Y             39U
+#define UI_MAIN_BASE_W             240U
+#define UI_MAIN_BASE_H             138U
+
+#define UI_MAIN_RETURN_X           228U
+#define UI_MAIN_RETURN_Y           183U
+#define UI_MAIN_RETURN_W           240U
+#define UI_MAIN_RETURN_H           124U
+
+#define UI_MAIN_CPU_VALUE          23U
+#define UI_MAIN_RAM_VALUE          58U
+
 typedef enum
 {
     UI_VIEW_MAIN = 0,  /*设计三个状态：主界面、快捷通信、返航引导*/
@@ -127,19 +185,39 @@ typedef enum
     UI_TOUCH_QUICK_BACK
 } UiTouchAction_t;
 
+typedef struct
+{
+    uint16_t x;
+    uint16_t y;
+    uint16_t w;
+    uint16_t h;
+    uint16_t color;
+    uint16_t value_bg;
+    const char *label;
+    const char *unit;
+    uint8_t icon;
+} UiMainStatusLayout_t;
 static uint8_t s_touchPressed = 0U;//触摸状态量
 static UiView_t s_view = UI_VIEW_MAIN;//视图状态量
 static UiView_t s_lastRenderedView = (UiView_t)0xFFU;//上次渲染的视图状态量，初始值设置为无效值以确保首次渲染
 static uint8_t s_mainValueValid = 0U;
 static uint32_t s_lastStatusValue[4];
-static uint16_t s_lastStatusBarW[4];
-static uint32_t s_lastBaseDistanceM = 0U;
-static uint8_t s_lastBaseSignal = 0U;
 static uint8_t s_lastReturnFrame = UI_RETURN_FRAME_NONE;
 static uint32_t s_lastReturnDistanceM = 0xFFFFFFFFU;
 static uint16_t s_returnIconBuffer[COMPASS_ICON_BBOX_MAX_W * COMPASS_ICON_BBOX_MAX_H];
 static uint16_t s_dashboardDecodeBuffer[UI_DASHBOARD_CHUNK_PIXELS];
 static uint8_t s_mainBackgroundValid = 0U;
+static uint8_t s_lastSignalValid = 0xFFU;
+static int16_t s_lastSignalDbm = 0;
+static uint32_t s_lastMainBaseDistanceM = 0xFFFFFFFFU;
+
+static const UiMainStatusLayout_t s_mainStatusLayout[4] =
+{
+    {11U, 39U, 210U, 66U, UI_COLOR_NGAS,   UI_MAIN_CARD0_VALUE_BG, "NGAS", "PPM", 0U},
+    {11U, 108U, 210U, 67U, UI_COLOR_SPO2,  UI_MAIN_CARD1_VALUE_BG, "LPG",  "PPM", 1U},
+    {11U, 178U, 210U, 63U, UI_COLOR_HR,    UI_MAIN_CARD2_VALUE_BG, "HR",   "BPM", 2U},
+    {11U, 244U, 210U, 63U, UI_COLOR_ACTION, UI_MAIN_CARD3_VALUE_BG, "SPO2", "%", 3U}
+};
 
 static void Ui_DiagLog(const char *fmt, ...)
 {
@@ -345,16 +423,6 @@ static uint32_t Ui_FloatToU32(float value)
 }
 
 /*计算进度条的像素宽度，线性比例映射*/
-static uint16_t Ui_BarWidthU32(uint32_t value, uint32_t max_value, uint16_t max_width)
-{
-    if ((max_value == 0U) || (value >= max_value))
-    {
-        return max_width;
-    }
-
-    return (uint16_t)((value * max_width) / max_value);
-}
-
 /*计算基础距离，返回以米为单位的整数*/
 static uint32_t Ui_BaseDistanceMeter(const AppSnapshot_t *snapshot)
 {
@@ -504,28 +572,6 @@ __weak int32_t App_UiGetReturnGuidance(const AppSnapshot_t *snapshot, UiReturnGu
 }
 
 /*依靠lora回传的rssi计算信号强度百分比，-120db——-40db*/
-static uint8_t Ui_SignalPercent(const AppSnapshot_t *snapshot)
-{
-    int16_t rssi;
-
-    if (snapshot->lora.last_rx.rssi_valid == 0U)
-    {
-        return 0U;
-    }
-
-    rssi = snapshot->lora.last_rx.rssi_dbm;
-    if (rssi <= -120)
-    {
-        return 0U;
-    }
-    if (rssi >= -40)
-    {
-        return 100U;
-    }
-
-    return (uint8_t)(((int32_t)rssi + 120) * 100 / 80);
-}
-
 
 static const uint8_t *Ui_Font5x7(char c)//半拉字库
 {
@@ -608,11 +654,21 @@ static const uint8_t *Ui_Font5x7(char c)//半拉字库
 }
 
 /*绘制字符*/
-static void Ui_DrawChar(uint16_t x, uint16_t y, char c, uint8_t scale, uint16_t color)
+static void Ui_DrawCharScaled(uint16_t x,
+                              uint16_t y,
+                              char c,
+                              uint8_t x_scale,
+                              uint8_t y_scale,
+                              uint16_t color)
 {
     const uint8_t *glyph;
     uint8_t row;
     uint8_t col;
+
+    if ((x_scale == 0U) || (y_scale == 0U))
+    {
+        return;
+    }
 
     glyph = Ui_Font5x7(c);
     for (row = 0U; row < 7U; row++)
@@ -622,14 +678,20 @@ static void Ui_DrawChar(uint16_t x, uint16_t y, char c, uint8_t scale, uint16_t 
             if ((glyph[row] & (uint8_t)(1U << (4U - col))) != 0U)
             {
                 (void)ILI9488_FillRect(&g_lcd,
-                                       (uint16_t)(x + (uint16_t)col * scale),
-                                       (uint16_t)(y + (uint16_t)row * scale),
-                                       scale,
-                                       scale,
+                                       (uint16_t)(x + (uint16_t)col * x_scale),
+                                       (uint16_t)(y + (uint16_t)row * y_scale),
+                                       x_scale,
+                                       y_scale,
                                        color);
             }
         }
     }
+}
+
+/*绘制字符*/
+static void Ui_DrawChar(uint16_t x, uint16_t y, char c, uint8_t scale, uint16_t color)
+{
+    Ui_DrawCharScaled(x, y, c, scale, scale, color);
 }
 
 /*从左到右依次绘制字符串中的每个字符*/
@@ -646,6 +708,28 @@ static void Ui_DrawText(uint16_t x, uint16_t y, const char *text, uint8_t scale,
     }
 }
 
+static void Ui_DrawTextScaled(uint16_t x,
+                              uint16_t y,
+                              const char *text,
+                              uint8_t x_scale,
+                              uint8_t y_scale,
+                              uint16_t color)
+{
+    uint16_t cursor_x;
+
+    if (text == NULL)
+    {
+        return;
+    }
+
+    cursor_x = x;
+    while (*text != '\0')
+    {
+        Ui_DrawCharScaled(cursor_x, y, *text, x_scale, y_scale, color);
+        cursor_x = (uint16_t)(cursor_x + (uint16_t)(6U * x_scale));
+        text++;
+    }
+}
 //花园
 static void Ui_FillCircle(uint16_t cx, uint16_t cy, uint16_t radius, uint16_t color)
 {
@@ -675,209 +759,6 @@ static void Ui_DrawCircleBorder(uint16_t cx, uint16_t cy, uint16_t radius, uint1
 {
     Ui_FillCircle(cx, cy, radius, color);
     Ui_FillCircle(cx, cy, (uint16_t)(radius - 3U), UI_COLOR_BG);
-}
-
-static void Ui_DrawLine(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t color)
-{
-    int16_t dx;
-    int16_t dy;
-    int16_t sx;
-    int16_t sy;
-    int16_t err;
-    int16_t e2;
-    int16_t x;
-    int16_t y;
-
-    x = (int16_t)x0;
-    y = (int16_t)y0;
-    dx = (x0 > x1) ? (int16_t)(x0 - x1) : (int16_t)(x1 - x0);
-    dy = (y0 > y1) ? -(int16_t)(y0 - y1) : -(int16_t)(y1 - y0);
-    sx = (x0 < x1) ? 1 : -1;
-    sy = (y0 < y1) ? 1 : -1;
-    err = (int16_t)(dx + dy);
-
-    for (;;)
-    {
-        (void)ILI9488_DrawPixel(&g_lcd, (uint16_t)x, (uint16_t)y, color);
-        if ((x == (int16_t)x1) && (y == (int16_t)y1))
-        {
-            break;
-        }
-        e2 = (int16_t)(2 * err);
-        if (e2 >= dy)
-        {
-            err = (int16_t)(err + dy);
-            x = (int16_t)(x + sx);
-        }
-        if (e2 <= dx)
-        {
-            err = (int16_t)(err + dx);
-            y = (int16_t)(y + sy);
-        }
-    }
-}
-
-static float Ui_NormalizeHeading(float heading_rad)
-{
-    while (heading_rad > UI_PI)
-    {
-        heading_rad -= (2.0f * UI_PI);
-    }
-    while (heading_rad < -UI_PI)
-    {
-        heading_rad += (2.0f * UI_PI);
-    }
-
-    return heading_rad;
-}
-
-static void Ui_RotatePoint(int16_t local_x,
-                           int16_t local_y,
-                           float heading_rad,
-                           uint16_t cx,
-                           uint16_t cy,
-                           uint16_t *screen_x,
-                           uint16_t *screen_y)
-{
-    float cos_h;
-    float sin_h;
-
-    cos_h = cosf(heading_rad);
-    sin_h = sinf(heading_rad);
-    *screen_x = (uint16_t)((int16_t)cx + (int16_t)(((float)local_x * cos_h) - ((float)local_y * sin_h)));
-    *screen_y = (uint16_t)((int16_t)cy + (int16_t)(((float)local_x * sin_h) + ((float)local_y * cos_h)));
-}
-
-static void Ui_DrawThickLine(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t color)
-{
-    Ui_DrawLine(x0, y0, x1, y1, color);
-    Ui_DrawLine((uint16_t)(x0 + 1U), y0, (uint16_t)(x1 + 1U), y1, color);
-    Ui_DrawLine((uint16_t)(x0 - 1U), y0, (uint16_t)(x1 - 1U), y1, color);
-    Ui_DrawLine(x0, (uint16_t)(y0 + 1U), x1, (uint16_t)(y1 + 1U), color);
-    Ui_DrawLine(x0, (uint16_t)(y0 - 1U), x1, (uint16_t)(y1 - 1U), color);
-}
-
-static void Ui_SwapI32(int32_t *a, int32_t *b)
-{
-    int32_t tmp;
-
-    tmp = *a;
-    *a = *b;
-    *b = tmp;
-}
-
-static void Ui_FillTriangle(uint16_t x0,
-                            uint16_t y0,
-                            uint16_t x1,
-                            uint16_t y1,
-                            uint16_t x2,
-                            uint16_t y2,
-                            uint16_t color)
-{
-    int32_t ax = x0;
-    int32_t ay = y0;
-    int32_t bx = x1;
-    int32_t by = y1;
-    int32_t cx = x2;
-    int32_t cy = y2;
-    int32_t y;
-
-    if (ay > by)
-    {
-        Ui_SwapI32(&ay, &by);
-        Ui_SwapI32(&ax, &bx);
-    }
-    if (by > cy)
-    {
-        Ui_SwapI32(&by, &cy);
-        Ui_SwapI32(&bx, &cx);
-    }
-    if (ay > by)
-    {
-        Ui_SwapI32(&ay, &by);
-        Ui_SwapI32(&ax, &bx);
-    }
-
-    for (y = ay; y <= cy; y++)
-    {
-        int32_t left;
-        int32_t right;
-
-        if ((cy - ay) == 0)
-        {
-            left = ax;
-        }
-        else
-        {
-            left = ax + ((cx - ax) * (y - ay)) / (cy - ay);
-        }
-
-        if (y < by)
-        {
-            right = ((by - ay) == 0) ? bx : ax + ((bx - ax) * (y - ay)) / (by - ay);
-        }
-        else
-        {
-            right = ((cy - by) == 0) ? cx : bx + ((cx - bx) * (y - by)) / (cy - by);
-        }
-
-        if (left > right)
-        {
-            Ui_SwapI32(&left, &right);
-        }
-
-        (void)ILI9488_FillRect(&g_lcd,
-                               (uint16_t)left,
-                               (uint16_t)y,
-                               (uint16_t)(right - left + 1),
-                               1U,
-                               color);
-    }
-}
-
-/* 纸飞机方向：0 表示屏幕正上方，正值顺时针旋转。 */
-static void Ui_DrawPaperPlane(uint16_t cx, uint16_t cy, uint16_t size, float heading_rad, uint16_t color)
-{
-    uint16_t tip_x;
-    uint16_t tip_y;
-    uint16_t left_x;
-    uint16_t left_y;
-    uint16_t tail_x;
-    uint16_t tail_y;
-    uint16_t right_x;
-    uint16_t right_y;
-    uint16_t fold_x;
-    uint16_t fold_y;
-    int16_t half_w;
-    int16_t lower_y;
-    int16_t tail_y_local;
-
-    heading_rad = Ui_NormalizeHeading(heading_rad);
-    half_w = (int16_t)((size * 58U) / 100U);
-    lower_y = (int16_t)((size * 42U) / 100U);
-    tail_y_local = (int16_t)((size * 18U) / 100U);
-
-    Ui_RotatePoint(0, (int16_t)(-(int16_t)size), heading_rad, cx, cy, &tip_x, &tip_y);
-    Ui_RotatePoint((int16_t)(-half_w), lower_y, heading_rad, cx, cy, &left_x, &left_y);
-    Ui_RotatePoint(0, tail_y_local, heading_rad, cx, cy, &tail_x, &tail_y);
-    Ui_RotatePoint(half_w, lower_y, heading_rad, cx, cy, &right_x, &right_y);
-    Ui_RotatePoint((int16_t)(-(int16_t)(size / 6U)), (int16_t)(size / 10U), heading_rad, cx, cy, &fold_x, &fold_y);
-
-    /* 先填充两侧机翼，再补轮廓，避免只显示线框。 */
-    Ui_FillTriangle(tip_x, tip_y, left_x, left_y, tail_x, tail_y, color);
-    Ui_FillTriangle(tip_x, tip_y, tail_x, tail_y, right_x, right_y, color);
-
-    Ui_DrawThickLine(tip_x, tip_y, left_x, left_y, color);
-    Ui_DrawThickLine(left_x, left_y, tail_x, tail_y, color);
-    Ui_DrawThickLine(tail_x, tail_y, right_x, right_y, color);
-    Ui_DrawThickLine(right_x, right_y, tip_x, tip_y, color);
-    Ui_DrawThickLine(tip_x, tip_y, tail_x, tail_y, color);
-    Ui_DrawThickLine(tip_x, tip_y, fold_x, fold_y, color);
-}
-
-static void Ui_DrawButtonArrow(uint16_t cx, uint16_t cy, uint16_t color)
-{
-    Ui_DrawPaperPlane(cx, cy, 30U, 0.0f, color);
 }
 
 static const uint16_t *Ui_GetStatusIconData(uint8_t icon)
@@ -942,14 +823,6 @@ static void Ui_DrawStatusIcon(uint16_t x, uint16_t y, uint8_t icon, uint16_t col
 }
 
 /*将数值和单位拼接成字符串后以 2 倍大小绘制*/
-static void Ui_DrawValueLine(uint16_t x, uint16_t y, uint32_t value, const char *unit, uint16_t color)
-{
-    char text[24];
-
-    (void)snprintf(text, sizeof(text), "%lu%s", (unsigned long)value, unit);
-    Ui_DrawText(x, y, text, 2U, color);
-}
-
 /*绘制状态卡片*/
 /*
 ┌─────────┬──────────────────────────────┐
@@ -962,124 +835,163 @@ static void Ui_DrawValueLine(uint16_t x, uint16_t y, uint32_t value, const char 
 
 
 */
-static void Ui_DrawStatusCardStatic(uint16_t y, const char *label, uint8_t icon, uint16_t color)
+static void Ui_DrawMainFallbackPanels(void)
 {
-    (void)ILI9488_FillRect(&g_lcd, UI_LEFT_X, y, UI_LEFT_W, UI_CARD_H, UI_COLOR_PANEL);
-    (void)ILI9488_FillRect(&g_lcd, UI_LEFT_X, y, 5U, UI_CARD_H, color);
-    Ui_DrawStatusIcon((uint16_t)(UI_LEFT_X + 12U), (uint16_t)(y + 10U), icon, color);
-    Ui_DrawText((uint16_t)(UI_LEFT_X + 70U), (uint16_t)(y + 10U), label, 2U, UI_COLOR_TEXT);
-    (void)ILI9488_FillRect(&g_lcd, (uint16_t)(UI_LEFT_X + 12U), (uint16_t)(y + 62U), (uint16_t)(UI_LEFT_W - 24U), 5U, UI_COLOR_PANEL_2);
-}
+    uint8_t i;
 
-static void Ui_UpdateStatusCardValue(uint8_t index,
-                                     uint16_t y,
-                                     uint32_t value,
-                                     const char *unit,
-                                     uint32_t max_value,
-                                     uint16_t color,
-                                     uint8_t force)
-{
-    uint16_t bar_w;
-
-    bar_w = Ui_BarWidthU32(value, max_value, (uint16_t)(UI_LEFT_W - 24U));
-
-    if ((force != 0U) ||
-        (s_mainValueValid == 0U) ||
-        (s_lastStatusValue[index] != value))
+    for (i = 0U; i < 4U; i++)
     {
         (void)ILI9488_FillRect(&g_lcd,
-                               (uint16_t)(UI_LEFT_X + UI_STATUS_VALUE_X_OFF),
-                               (uint16_t)(y + UI_STATUS_VALUE_Y_OFF),
-                               UI_STATUS_VALUE_W,
-                               UI_STATUS_VALUE_H,
+                               s_mainStatusLayout[i].x,
+                               s_mainStatusLayout[i].y,
+                               s_mainStatusLayout[i].w,
+                               s_mainStatusLayout[i].h,
                                UI_COLOR_PANEL);
-        Ui_DrawValueLine((uint16_t)(UI_LEFT_X + UI_STATUS_VALUE_X_OFF),
-                         (uint16_t)(y + UI_STATUS_VALUE_Y_OFF),
-                         value,
-                         unit,
-                         color);
-        s_lastStatusValue[index] = value;
     }
+    (void)ILI9488_FillRect(&g_lcd, UI_MAIN_BASE_X, UI_MAIN_BASE_Y, UI_MAIN_BASE_W, UI_MAIN_BASE_H, UI_COLOR_ACTION);
+    (void)ILI9488_FillRect(&g_lcd, UI_MAIN_RETURN_X, UI_MAIN_RETURN_Y, UI_MAIN_RETURN_W, UI_MAIN_RETURN_H, UI_RGB565(230U, 126U, 34U));
+}
 
-    if ((force != 0U) ||
-        (s_mainValueValid == 0U) ||
-        (s_lastStatusBarW[index] != bar_w))
+static void Ui_UpdateTopSignal(const AppSnapshot_t *snapshot, uint8_t force)
+{
+    char text[16];
+    uint8_t valid;
+    int16_t rssi;
+
+    valid = snapshot->lora.last_rx.rssi_valid;
+    rssi = snapshot->lora.last_rx.rssi_dbm;
+    if ((force == 0U) && (s_lastSignalValid == valid) &&
+        ((valid == 0U) || (s_lastSignalDbm == rssi)))
     {
-        (void)ILI9488_FillRect(&g_lcd,
-                               (uint16_t)(UI_LEFT_X + 12U),
-                               (uint16_t)(y + 62U),
-                               (uint16_t)(UI_LEFT_W - 24U),
-                               5U,
-                               UI_COLOR_PANEL_2);
-        (void)ILI9488_FillRect(&g_lcd,
-                               (uint16_t)(UI_LEFT_X + 12U),
-                               (uint16_t)(y + 62U),
-                               bar_w,
-                               5U,
-                               color);
-        s_lastStatusBarW[index] = bar_w;
+        return;
     }
+
+    (void)ILI9488_FillRect(&g_lcd,
+                           UI_MAIN_SIGNAL_VALUE_X,
+                           UI_MAIN_SIGNAL_VALUE_Y,
+                           UI_MAIN_SIGNAL_VALUE_W,
+                           UI_MAIN_SIGNAL_VALUE_H,
+                           UI_MAIN_TOP_VALUE_BG);
+    if (valid != 0U)
+    {
+        (void)snprintf(text, sizeof(text), "%dDBM", (int)rssi);
+    }
+    else
+    {
+        (void)snprintf(text, sizeof(text), "--DBM");
+    }
+    Ui_DrawTextScaled(UI_MAIN_SIGNAL_VALUE_X, UI_MAIN_SIGNAL_VALUE_Y, text, UI_MAIN_TOP_TEXT_X_SCALE, UI_MAIN_TOP_TEXT_Y_SCALE, UI_COLOR_TEXT);
+    s_lastSignalValid = valid;
+    s_lastSignalDbm = rssi;
 }
 
-static void Ui_DrawQuickCircleStatic(void)
+static void Ui_DrawMainTopFixedValues(void)
 {
-    Ui_FillCircle(UI_QUICK_CX, UI_QUICK_CY, UI_QUICK_R, UI_COLOR_PANEL);
-    Ui_DrawCircleBorder(UI_QUICK_CX, UI_QUICK_CY, UI_QUICK_R, UI_COLOR_ACTION);
-    Ui_DrawText((uint16_t)((int16_t)UI_QUICK_CX + UI_BASE_TEXT_X_OFF),
-                (uint16_t)((int16_t)UI_QUICK_CY + UI_BASE_TEXT_Y_OFF),
-                UI_BASE_TEXT,
-                2U,
-                UI_COLOR_TEXT);
+    char text[8];
+
+    (void)ILI9488_FillRect(&g_lcd,
+                           UI_MAIN_CPU_VALUE_X,
+                           UI_MAIN_CPU_VALUE_Y,
+                           UI_MAIN_CPU_VALUE_W,
+                           UI_MAIN_CPU_VALUE_H,
+                           UI_MAIN_CPU_VALUE_BG);
+    (void)snprintf(text, sizeof(text), "%u%%", (unsigned int)UI_MAIN_CPU_VALUE);
+    Ui_DrawTextScaled(UI_MAIN_CPU_VALUE_X, UI_MAIN_CPU_VALUE_Y, text, UI_MAIN_TOP_TEXT_X_SCALE, UI_MAIN_TOP_TEXT_Y_SCALE, UI_COLOR_SPO2);
+
+    (void)ILI9488_FillRect(&g_lcd,
+                           UI_MAIN_RAM_VALUE_X,
+                           UI_MAIN_RAM_VALUE_Y,
+                           UI_MAIN_RAM_VALUE_W,
+                           UI_MAIN_RAM_VALUE_H,
+                           UI_MAIN_RAM_VALUE_BG);
+    (void)snprintf(text, sizeof(text), "%u%%", (unsigned int)UI_MAIN_RAM_VALUE);
+    Ui_DrawTextScaled(UI_MAIN_RAM_VALUE_X, UI_MAIN_RAM_VALUE_Y, text, UI_MAIN_TOP_TEXT_X_SCALE, UI_MAIN_TOP_TEXT_Y_SCALE, UI_COLOR_ACTION);
 }
 
-static void Ui_UpdateQuickCircleValue(const AppSnapshot_t *snapshot, uint8_t force)
+static void Ui_UpdateMainBaseInfo(const AppSnapshot_t *snapshot, uint8_t force)
 {
-    char text[24];
+    char text[16];
     uint32_t distance_m;
-    uint8_t signal;
 
     distance_m = Ui_BaseDistanceMeter(snapshot);
-    signal = Ui_SignalPercent(snapshot);
-
-    if ((force != 0U) ||
-        (s_mainValueValid == 0U) ||
-        (s_lastBaseDistanceM != distance_m))
+    if ((force != 0U) || (s_lastMainBaseDistanceM != distance_m))
     {
         (void)ILI9488_FillRect(&g_lcd,
-                               (uint16_t)(UI_QUICK_CX - 46U),
-                               (uint16_t)(UI_QUICK_CY - 8U),
-                               96U,
-                               22U,
-                               UI_COLOR_PANEL);
+                               UI_MAIN_BASE_DIST_X,
+                               UI_MAIN_BASE_DIST_Y,
+                               UI_MAIN_BASE_DIST_W,
+                               UI_MAIN_BASE_DIST_H,
+                               UI_MAIN_BASE_INFO_BG);
         (void)snprintf(text, sizeof(text), "%luM", (unsigned long)distance_m);
-        Ui_DrawText((uint16_t)((int16_t)UI_QUICK_CX + UI_BASE_DIST_X_OFF),
-                    (uint16_t)((int16_t)UI_QUICK_CY + UI_BASE_DIST_Y_OFF),
-                    text,
-                    2U,
-                    UI_COLOR_ACTION);
-        s_lastBaseDistanceM = distance_m;
-    }
-
-    if ((force != 0U) ||
-        (s_mainValueValid == 0U) ||
-        (s_lastBaseSignal != signal))
-    {
-        (void)ILI9488_FillRect(&g_lcd,
-                               (uint16_t)(UI_QUICK_CX - 44U),
-                               (uint16_t)(UI_QUICK_CY + 22U),
-                               72U,
-                               10U,
-                               UI_COLOR_PANEL);
-        (void)snprintf(text, sizeof(text), "SIG:%u%%", signal);
-        Ui_DrawText((uint16_t)((int16_t)UI_QUICK_CX + UI_BASE_SIG_X_OFF),
-                    (uint16_t)((int16_t)UI_QUICK_CY + UI_BASE_SIG_Y_OFF),
-                    text,
-                    1U,
-                    UI_COLOR_MUTED);
-        s_lastBaseSignal = signal;
+        Ui_DrawTextScaled(UI_MAIN_BASE_DIST_X, UI_MAIN_BASE_DIST_Y, text, UI_MAIN_BASE_DIST_X_SCALE, UI_MAIN_BASE_DIST_Y_SCALE, UI_COLOR_TEXT);
+        s_lastMainBaseDistanceM = distance_m;
     }
 }
+static void Ui_DrawMainStaticOverlay(const AppSnapshot_t *snapshot)
+{
+    uint8_t i;
 
+    Ui_UpdateTopSignal(snapshot, 1U);
+    Ui_DrawMainTopFixedValues();
+    Ui_UpdateMainBaseInfo(snapshot, 1U);
+
+    for (i = 0U; i < 4U; i++)
+    {
+        const UiMainStatusLayout_t *card = &s_mainStatusLayout[i];
+        Ui_DrawStatusIcon((uint16_t)(card->x + UI_MAIN_CARD_ICON_X - 2U),
+                          (uint16_t)(card->y + UI_MAIN_CARD_ICON_Y - 3U),
+                          card->icon,
+                          card->color);
+        Ui_DrawText((uint16_t)(card->x + UI_MAIN_CARD_LABEL_X),
+                    (uint16_t)(card->y + UI_MAIN_CARD_LABEL_Y),
+                    card->label,
+                    2U,
+                    UI_COLOR_TEXT);
+        Ui_DrawTextScaled((uint16_t)(card->x + UI_MAIN_CARD_UNIT_X),
+                          (uint16_t)(card->y + UI_MAIN_CARD_UNIT_Y),
+                          card->unit,
+                          1U,
+                          2U,
+                          card->color);
+    }
+}
+static void Ui_UpdateMainStatusCard(uint8_t index, uint32_t value, uint8_t force)
+{
+    char text[16];
+    const UiMainStatusLayout_t *card;
+
+    if (index >= 4U)
+    {
+        return;
+    }
+    if ((force == 0U) && (s_mainValueValid != 0U) && (s_lastStatusValue[index] == value))
+    {
+        return;
+    }
+
+    card = &s_mainStatusLayout[index];
+    (void)ILI9488_FillRect(&g_lcd,
+                           (uint16_t)(card->x + UI_MAIN_CARD_VALUE_X),
+                           (uint16_t)(card->y + UI_MAIN_CARD_VALUE_Y),
+                           UI_MAIN_CARD_VALUE_W,
+                           UI_MAIN_CARD_VALUE_H,
+                           card->value_bg);
+    (void)snprintf(text, sizeof(text), "%lu", (unsigned long)value);
+    Ui_DrawTextScaled((uint16_t)(card->x + UI_MAIN_CARD_VALUE_X),
+                      (uint16_t)(card->y + UI_MAIN_CARD_VALUE_Y),
+                      text,
+                      UI_MAIN_CARD_VALUE_X_SCALE,
+                      UI_MAIN_CARD_VALUE_Y_SCALE,
+                      card->color);
+    /* Redraw unit because the value refresh area overlaps it. */
+    Ui_DrawTextScaled((uint16_t)(card->x + UI_MAIN_CARD_UNIT_X),
+                      (uint16_t)(card->y + UI_MAIN_CARD_UNIT_Y),
+                      card->unit,
+                      UI_MAIN_CARD_UNIT_X_SCALE,
+                      UI_MAIN_CARD_UNIT_Y_SCALE,
+                      card->color);
+    s_lastStatusValue[index] = value;
+}
 static void Ui_DrawBackCircle(void)
 {
     Ui_FillCircle(UI_QUICK_CX, UI_QUICK_CY, UI_QUICK_R, UI_COLOR_PANEL);
@@ -1088,22 +1000,8 @@ static void Ui_DrawBackCircle(void)
     Ui_DrawText((uint16_t)(UI_QUICK_CX - 20U), (uint16_t)(UI_QUICK_CY + 18U), "TAP", 1U, UI_COLOR_MUTED);
 }
 
-static void Ui_DrawReturnButton(void)
-{
-    (void)ILI9488_FillRect(&g_lcd, UI_RIGHT_X, UI_HOME_BTN_Y, UI_RIGHT_W, UI_HOME_BTN_H, UI_COLOR_ACTION);
-    Ui_DrawText((uint16_t)(UI_RIGHT_X + UI_HOME_TEXT_X_OFF),
-                (uint16_t)(UI_HOME_BTN_Y + UI_HOME_TEXT_Y_OFF),
-                "HOME",
-                3U,
-                UI_COLOR_TEXT);
-    Ui_DrawButtonArrow((uint16_t)(UI_RIGHT_X + UI_HOME_ICON_X_OFF),
-                       (uint16_t)(UI_HOME_BTN_Y + UI_HOME_ICON_Y_OFF),
-                       UI_COLOR_TEXT);
-}
-
 static void Ui_DrawMainView(const AppSnapshot_t *snapshot, uint8_t full_redraw)
 {
-    uint16_t y;
     uint8_t force_update;
     uint32_t value[4];
 
@@ -1119,36 +1017,21 @@ static void Ui_DrawMainView(const AppSnapshot_t *snapshot, uint8_t full_redraw)
         {
             s_mainBackgroundValid = (Ui_DrawDashboardBackground() == 0) ? 1U : 0U;
         }
-
         if (s_mainBackgroundValid == 0U)
         {
-            y = 10U;
-            Ui_DrawStatusCardStatic(y, "NGAS", 0U, UI_COLOR_NGAS);
-            y = (uint16_t)(y + UI_CARD_H + UI_CARD_GAP);
-            Ui_DrawStatusCardStatic(y, "LPG", 1U, UI_COLOR_LPG);
-            y = (uint16_t)(y + UI_CARD_H + UI_CARD_GAP);
-            Ui_DrawStatusCardStatic(y, "HR", 2U, UI_COLOR_HR);
-            y = (uint16_t)(y + UI_CARD_H + UI_CARD_GAP);
-            Ui_DrawStatusCardStatic(y, "SPO2", 3U, UI_COLOR_SPO2);
-
-            (void)ILI9488_FillRect(&g_lcd, UI_RIGHT_X, 8U, UI_RIGHT_W, 312U, UI_COLOR_BG);
-            Ui_DrawQuickCircleStatic();
-            Ui_DrawReturnButton();
+            Ui_DrawMainFallbackPanels();
         }
+        Ui_DrawMainStaticOverlay(snapshot);
     }
 
-    y = 10U;
-    Ui_UpdateStatusCardValue(0U, y, value[0], "PPM", UI_GAS_BAR_MAX_PPM, UI_COLOR_NGAS, force_update);
-    y = (uint16_t)(y + UI_CARD_H + UI_CARD_GAP);
-    Ui_UpdateStatusCardValue(1U, y, value[1], "PPM", UI_GAS_BAR_MAX_PPM, UI_COLOR_LPG, force_update);
-    y = (uint16_t)(y + UI_CARD_H + UI_CARD_GAP);
-    Ui_UpdateStatusCardValue(2U, y, value[2], "BPM", 200U, UI_COLOR_HR, force_update);
-    y = (uint16_t)(y + UI_CARD_H + UI_CARD_GAP);
-    Ui_UpdateStatusCardValue(3U, y, value[3], "%", 100U, UI_COLOR_SPO2, force_update);
-    Ui_UpdateQuickCircleValue(snapshot, force_update);
+    Ui_UpdateTopSignal(snapshot, force_update);
+    Ui_UpdateMainBaseInfo(snapshot, force_update);
+    Ui_UpdateMainStatusCard(0U, value[0], force_update);
+    Ui_UpdateMainStatusCard(1U, value[1], force_update);
+    Ui_UpdateMainStatusCard(2U, value[2], force_update);
+    Ui_UpdateMainStatusCard(3U, value[3], force_update);
     s_mainValueValid = 1U;
 }
-
 static void Ui_DrawQuickButton(uint16_t y, const char *label)
 {
     (void)ILI9488_FillRect(&g_lcd, 28U, y, 232U, 54U, UI_COLOR_PANEL);
@@ -1157,10 +1040,10 @@ static void Ui_DrawQuickButton(uint16_t y, const char *label)
 
 static void Ui_DrawQuickView(void)
 {
-    Ui_DrawText(30U, 24U, "QUICK CMD", 2U, UI_COLOR_TEXT);
-    Ui_DrawQuickButton(70U, "SEND 1");
-    Ui_DrawQuickButton(136U, "SEND 2");
-    Ui_DrawQuickButton(202U, "SEND 3");
+    Ui_DrawText(30U, 24U, "QUICK CMD", 2U, UI_COLOR_TEXT);//快捷指令
+    Ui_DrawQuickButton(70U, "SEND 1");  //请求支援
+    Ui_DrawQuickButton(136U, "SEND 2"); //危险区域
+    Ui_DrawQuickButton(202U, "SEND 3"); //安全区域
     Ui_DrawBackCircle();
 }
 
@@ -1241,12 +1124,12 @@ static UiTouchAction_t Ui_HandleTouch(uint16_t x, uint16_t y, AppCommandMsg_t *c
 
     if (s_view == UI_VIEW_MAIN)
     {
-        if (Ui_PointInQuickCircle(x, y) != 0U)
+        if (Ui_PointInRect(x, y, UI_MAIN_BASE_X, UI_MAIN_BASE_Y, UI_MAIN_BASE_W, UI_MAIN_BASE_H) != 0U)
         {
             s_view = UI_VIEW_QUICK;
             return UI_TOUCH_QUICK;
         }
-        if (Ui_PointInRect(x, y, UI_RIGHT_X, UI_HOME_BTN_Y, UI_RIGHT_W, UI_HOME_BTN_H) != 0U)
+        if (Ui_PointInRect(x, y, UI_MAIN_RETURN_X, UI_MAIN_RETURN_Y, UI_MAIN_RETURN_W, UI_MAIN_RETURN_H) != 0U)
         {
             s_view = UI_VIEW_RETURN;
             command->id = APP_CMD_RETURN_HOME_START;
