@@ -7,6 +7,7 @@
 #include "cmsis_os.h"
 #include "dijkstra.h"
 #include "task_debug.h"
+#include "task_lora.h"
 
 #include <string.h>
 
@@ -26,6 +27,20 @@ static void task_control_dispatch_return(const AppCommandMsg_t *command)
 
     return_command.id = command->id;
     (void)osMessageQueuePut(g_returnCmdQueue, &return_command, 0U, 0U);
+}
+
+static void task_control_send_quick_lora(uint32_t command_id)
+{
+    uint8_t payload;
+
+    if ((command_id < 1U) || (command_id > 3U))
+    {
+        return;
+    }
+
+    /* 快捷指令只发送单字节，降低 LoRa 发送负担。 */
+    payload = (uint8_t)('0' + command_id);
+    (void)Lora_SendBytes(&payload, 1U);
 }
 
 static void task_control_apply_nav_delta(const NavDeltaMsg_t *delta)
@@ -76,8 +91,7 @@ static void task_control_dispatch_ui_command(const AppCommandMsg_t *command)
             break;
 
         case APP_CMD_LORA_SEND:
-            /* 待你完善：组织 LoRa 发送包并投递到 g_loraTxQueue。 */
-            App_DebugLog("ui requested lora send");
+            task_control_send_quick_lora(command->param0);
             break;
 
         case APP_CMD_MARK_PATH_POINT:

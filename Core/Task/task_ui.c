@@ -96,7 +96,7 @@
 #define UI_RETURN_ICON_Y      42U
 #define UI_RETURN_ICON_W      COMPASS_ICON_WIDTH
 #define UI_RETURN_ICON_H      COMPASS_ICON_HEIGHT
-#define UI_RETURN_TEXT_X      190U
+#define UI_RETURN_TEXT_X      220U
 #define UI_RETURN_TEXT_Y      230U
 #define UI_RETURN_TEXT_W      210U
 #define UI_RETURN_TEXT_H      48U
@@ -164,6 +164,17 @@
 #define UI_MAIN_RETURN_Y           183U
 #define UI_MAIN_RETURN_W           240U
 #define UI_MAIN_RETURN_H           124U
+
+#define UI_QUICK_BTN_X             28U
+#define UI_QUICK_BTN_W             232U
+#define UI_QUICK_BTN_H             54U
+#define UI_QUICK_BTN1_Y            70U
+#define UI_QUICK_BTN2_Y            136U
+#define UI_QUICK_BTN3_Y            202U
+#define UI_QUICK_TITLE_X           30U
+#define UI_QUICK_TITLE_Y           20U
+#define UI_QUICK_HZ_SCALE          2U
+#define UI_QUICK_HZ_SPACING        4U
 
 #define UI_MAIN_CPU_VALUE          23U
 #define UI_MAIN_RAM_VALUE          58U
@@ -730,37 +741,121 @@ static void Ui_DrawTextScaled(uint16_t x,
         text++;
     }
 }
-//花园
-static void Ui_FillCircle(uint16_t cx, uint16_t cy, uint16_t radius, uint16_t color)
-{
-    int16_t dy;
-    int16_t dx;
-    int32_t r2;
 
-    r2 = (int32_t)radius * (int32_t)radius;
-    for (dy = -(int16_t)radius; dy <= (int16_t)radius; dy++)
+typedef enum
+{
+    UI_HZ_KUAI = 0,
+    UI_HZ_JIE,
+    UI_HZ_ZHI,
+    UI_HZ_LING,
+    UI_HZ_QING,
+    UI_HZ_QIU,
+    UI_HZ_ZHIYUAN_ZHI,
+    UI_HZ_YUAN,
+    UI_HZ_WEI,
+    UI_HZ_XIAN,
+    UI_HZ_QU,
+    UI_HZ_YU,
+    UI_HZ_AN,
+    UI_HZ_QUAN,
+    UI_HZ_COUNT
+} UiHzGlyphId_t;
+
+static const uint16_t s_uiHzGlyph[UI_HZ_COUNT][16] =
+{
+    {0x0000U, 0x0840U, 0x0840U, 0x0DF8U, 0x2C48U, 0x2E48U, 0x2848U, 0x2BFCU, 0x0860U, 0x08A0U, 0x0990U, 0x0908U, 0x0E04U, 0x0000U, 0x0000U, 0x0000U},
+    {0x0000U, 0x0860U, 0x0BFCU, 0x0860U, 0x3DF8U, 0x0BFCU, 0x0C68U, 0x1DF8U, 0x2860U, 0x097CU, 0x0960U, 0x0AE0U, 0x363CU, 0x0000U, 0x0000U, 0x0000U},
+    {0x0000U, 0x0900U, 0x0938U, 0x09C0U, 0x3D04U, 0x090CU, 0x08F0U, 0x1DF8U, 0x2908U, 0x09F8U, 0x0908U, 0x09F8U, 0x3908U, 0x0000U, 0x0000U, 0x0000U},
+    {0x0100U, 0x0100U, 0x0380U, 0x0660U, 0x0D30U, 0x199CU, 0x2084U, 0x1FF8U, 0x0018U, 0x0020U, 0x0640U, 0x0380U, 0x00C0U, 0x0040U, 0x0000U, 0x0000U},
+    {0x0000U, 0x1040U, 0x1BFCU, 0x0BFCU, 0x0040U, 0x33FCU, 0x1000U, 0x11F8U, 0x11F8U, 0x1508U, 0x1DF8U, 0x1908U, 0x1118U, 0x0000U, 0x0000U, 0x0000U},
+    {0x0000U, 0x0130U, 0x0110U, 0x3FFCU, 0x0100U, 0x1188U, 0x0990U, 0x0160U, 0x0340U, 0x0D20U, 0x1918U, 0x210CU, 0x0300U, 0x0000U, 0x0000U, 0x0000U},
+    {0x0000U, 0x0100U, 0x0100U, 0x3FFCU, 0x0100U, 0x0100U, 0x0FF0U, 0x0420U, 0x0260U, 0x0340U, 0x0180U, 0x0660U, 0x381CU, 0x0000U, 0x0000U, 0x0000U},
+    {0x0000U, 0x13FCU, 0x1048U, 0x1168U, 0x3D18U, 0x11E4U, 0x13FCU, 0x1C80U, 0x30F8U, 0x1158U, 0x1150U, 0x1270U, 0x31DCU, 0x0000U, 0x0000U, 0x0000U},
+    {0x0000U, 0x0600U, 0x0FE0U, 0x1820U, 0x3FFCU, 0x0800U, 0x0800U, 0x0BF0U, 0x1A10U, 0x1270U, 0x1240U, 0x3204U, 0x23F8U, 0x0000U, 0x0000U, 0x0000U},
+    {0x0000U, 0x3C40U, 0x24A0U, 0x2890U, 0x2918U, 0x2BFCU, 0x2C00U, 0x2448U, 0x2558U, 0x2D50U, 0x2910U, 0x2010U, 0x23FCU, 0x0000U, 0x0000U, 0x0000U},
+    {0x0000U, 0x3FFCU, 0x3000U, 0x3010U, 0x3630U, 0x31A0U, 0x30C0U, 0x30E0U, 0x31B0U, 0x3318U, 0x3400U, 0x3000U, 0x3FFCU, 0x0000U, 0x0000U, 0x0000U},
+    {0x0000U, 0x1028U, 0x1028U, 0x17FCU, 0x1020U, 0x3BACU, 0x12A8U, 0x12A8U, 0x12A8U, 0x1110U, 0x3810U, 0x27BCU, 0x004CU, 0x0000U, 0x0000U, 0x0000U},
+    {0x0000U, 0x0100U, 0x0100U, 0x1EF8U, 0x1108U, 0x0200U, 0x3FFCU, 0x0420U, 0x0420U, 0x0F40U, 0x00E0U, 0x0338U, 0x1C0CU, 0x0000U, 0x0000U, 0x0000U},
+    {0x0000U, 0x0180U, 0x0380U, 0x0640U, 0x0C30U, 0x381CU, 0x2FF4U, 0x0080U, 0x0080U, 0x0FF8U, 0x0080U, 0x0080U, 0x3FF8U, 0x0000U, 0x0000U, 0x0000U}
+};
+
+static void Ui_DrawHzGlyph(uint16_t x, uint16_t y, uint8_t glyph_id, uint8_t scale, uint16_t color)
+{
+    uint8_t row;
+    uint8_t col;
+    uint8_t run_start;
+    uint16_t bits;
+
+    if ((glyph_id >= (uint8_t)UI_HZ_COUNT) || (scale == 0U))
     {
-        dx = (int16_t)radius;
-        while ((((int32_t)dx * dx) + ((int32_t)dy * dy)) > r2)
+        return;
+    }
+
+    /* Draw each continuous row segment once to reduce SPI transactions. */
+    for (row = 0U; row < 16U; row++)
+    {
+        bits = s_uiHzGlyph[glyph_id][row];
+        col = 0U;
+        while (col < 16U)
         {
-            dx--;
+            while ((col < 16U) && ((bits & (uint16_t)(1U << (15U - col))) == 0U))
+            {
+                col++;
+            }
+            run_start = col;
+            while ((col < 16U) && ((bits & (uint16_t)(1U << (15U - col))) != 0U))
+            {
+                col++;
+            }
+            if (run_start < col)
+            {
+                (void)ILI9488_FillRect(&g_lcd,
+                                       (uint16_t)(x + ((uint16_t)run_start * scale)),
+                                       (uint16_t)(y + ((uint16_t)row * scale)),
+                                       (uint16_t)((uint16_t)(col - run_start) * scale),
+                                       scale,
+                                       color);
+            }
         }
-        (void)ILI9488_FillRect(&g_lcd,
-                               (uint16_t)((int16_t)cx - dx),
-                               (uint16_t)((int16_t)cy + dy),
-                               (uint16_t)((dx * 2) + 1),
-                               1U,
-                               color);
     }
 }
 
-//三像素宽的圆圈
-static void Ui_DrawCircleBorder(uint16_t cx, uint16_t cy, uint16_t radius, uint16_t color)
+static uint16_t Ui_HzTextWidth(uint8_t count, uint8_t scale)
 {
-    Ui_FillCircle(cx, cy, radius, color);
-    Ui_FillCircle(cx, cy, (uint16_t)(radius - 3U), UI_COLOR_BG);
+    if (count == 0U)
+    {
+        return 0U;
+    }
+    return (uint16_t)(((uint16_t)count * 16U * scale) + (((uint16_t)count - 1U) * UI_QUICK_HZ_SPACING));
 }
 
+static void Ui_DrawHzText(uint16_t x, uint16_t y, const uint8_t *text, uint8_t count, uint8_t scale, uint16_t color)
+{
+    uint8_t i;
+    uint16_t cursor_x;
+
+    if (text == NULL)
+    {
+        return;
+    }
+
+    cursor_x = x;
+    for (i = 0U; i < count; i++)
+    {
+        Ui_DrawHzGlyph(cursor_x, y, text[i], scale, color);
+        cursor_x = (uint16_t)(cursor_x + (uint16_t)(16U * scale) + UI_QUICK_HZ_SPACING);
+    }
+}
+
+static void Ui_DrawHzTextCentered(uint16_t x, uint16_t y, uint16_t w, const uint8_t *text, uint8_t count, uint8_t scale, uint16_t color)
+{
+    uint16_t text_w;
+    uint16_t draw_x;
+
+    text_w = Ui_HzTextWidth(count, scale);
+    draw_x = (text_w >= w) ? x : (uint16_t)(x + ((w - text_w) / 2U));
+    Ui_DrawHzText(draw_x, y, text, count, scale, color);
+}
 static const uint16_t *Ui_GetStatusIconData(uint8_t icon)
 {
     switch (icon)
@@ -992,14 +1087,6 @@ static void Ui_UpdateMainStatusCard(uint8_t index, uint32_t value, uint8_t force
                       card->color);
     s_lastStatusValue[index] = value;
 }
-static void Ui_DrawBackCircle(void)
-{
-    Ui_FillCircle(UI_QUICK_CX, UI_QUICK_CY, UI_QUICK_R, UI_COLOR_PANEL);
-    Ui_DrawCircleBorder(UI_QUICK_CX, UI_QUICK_CY, UI_QUICK_R, UI_COLOR_ACTION);
-    Ui_DrawText((uint16_t)(UI_QUICK_CX - 30U), (uint16_t)(UI_QUICK_CY - 16U), "BACK", 2U, UI_COLOR_TEXT);
-    Ui_DrawText((uint16_t)(UI_QUICK_CX - 20U), (uint16_t)(UI_QUICK_CY + 18U), "TAP", 1U, UI_COLOR_MUTED);
-}
-
 static void Ui_DrawMainView(const AppSnapshot_t *snapshot, uint8_t full_redraw)
 {
     uint8_t force_update;
@@ -1032,19 +1119,29 @@ static void Ui_DrawMainView(const AppSnapshot_t *snapshot, uint8_t full_redraw)
     Ui_UpdateMainStatusCard(3U, value[3], force_update);
     s_mainValueValid = 1U;
 }
-static void Ui_DrawQuickButton(uint16_t y, const char *label)
+static void Ui_DrawQuickButton(uint16_t y, const uint8_t *text, uint8_t count)
 {
-    (void)ILI9488_FillRect(&g_lcd, 28U, y, 232U, 54U, UI_COLOR_PANEL);
-    Ui_DrawText(58U, (uint16_t)(y + 18U), label, 2U, UI_COLOR_TEXT);
+    (void)ILI9488_FillRect(&g_lcd, UI_QUICK_BTN_X, y, UI_QUICK_BTN_W, UI_QUICK_BTN_H, UI_COLOR_PANEL);
+    Ui_DrawHzTextCentered(UI_QUICK_BTN_X,
+                          (uint16_t)(y + 11U),
+                          UI_QUICK_BTN_W,
+                          text,
+                          count,
+                          UI_QUICK_HZ_SCALE,
+                          UI_COLOR_TEXT);
 }
 
 static void Ui_DrawQuickView(void)
 {
-    Ui_DrawText(30U, 24U, "QUICK CMD", 2U, UI_COLOR_TEXT);//快捷指令
-    Ui_DrawQuickButton(70U, "SEND 1");  //请求支援
-    Ui_DrawQuickButton(136U, "SEND 2"); //危险区域
-    Ui_DrawQuickButton(202U, "SEND 3"); //安全区域
-    Ui_DrawBackCircle();
+    static const uint8_t title[] = {UI_HZ_KUAI, UI_HZ_JIE, UI_HZ_ZHI, UI_HZ_LING};
+    static const uint8_t support[] = {UI_HZ_QING, UI_HZ_QIU, UI_HZ_ZHIYUAN_ZHI, UI_HZ_YUAN};
+    static const uint8_t danger[] = {UI_HZ_WEI, UI_HZ_XIAN, UI_HZ_QU, UI_HZ_YU};
+    static const uint8_t safe[] = {UI_HZ_AN, UI_HZ_QUAN, UI_HZ_QU, UI_HZ_YU};
+
+    Ui_DrawHzText(UI_QUICK_TITLE_X, UI_QUICK_TITLE_Y, title, (uint8_t)sizeof(title), UI_QUICK_HZ_SCALE, UI_COLOR_TEXT);//快捷指令
+    Ui_DrawQuickButton(UI_QUICK_BTN1_Y, support, (uint8_t)sizeof(support));  //请求支援
+    Ui_DrawQuickButton(UI_QUICK_BTN2_Y, danger, (uint8_t)sizeof(danger));    //危险区域
+    Ui_DrawQuickButton(UI_QUICK_BTN3_Y, safe, (uint8_t)sizeof(safe));        //安全区域
 }
 
 static void Ui_DrawReturnView(const AppSnapshot_t *snapshot, uint8_t full_redraw)
@@ -1108,16 +1205,6 @@ static uint8_t Ui_PointInRect(uint16_t x, uint16_t y, uint16_t rx, uint16_t ry, 
     return ((x >= rx) && (x < (uint16_t)(rx + rw)) && (y >= ry) && (y < (uint16_t)(ry + rh))) ? 1U : 0U;
 }
 
-static uint8_t Ui_PointInQuickCircle(uint16_t x, uint16_t y)
-{
-    int32_t dx;
-    int32_t dy;
-
-    dx = (int32_t)x - (int32_t)UI_QUICK_CX;
-    dy = (int32_t)y - (int32_t)UI_QUICK_CY;
-    return (((dx * dx) + (dy * dy)) <= ((int32_t)UI_QUICK_R * (int32_t)UI_QUICK_R)) ? 1U : 0U;
-}
-
 static UiTouchAction_t Ui_HandleTouch(uint16_t x, uint16_t y, AppCommandMsg_t *command)
 {
     memset(command, 0, sizeof(*command));
@@ -1138,29 +1225,27 @@ static UiTouchAction_t Ui_HandleTouch(uint16_t x, uint16_t y, AppCommandMsg_t *c
     }
     else if (s_view == UI_VIEW_QUICK)
     {
-        if (Ui_PointInQuickCircle(x, y) != 0U)
-        {
-            s_view = UI_VIEW_MAIN;
-            return UI_TOUCH_QUICK_BACK;
-        }
-        if (Ui_PointInRect(x, y, 28U, 70U, 232U, 54U) != 0U)
+        if (Ui_PointInRect(x, y, UI_QUICK_BTN_X, UI_QUICK_BTN1_Y, UI_QUICK_BTN_W, UI_QUICK_BTN_H) != 0U)
         {
             command->id = APP_CMD_LORA_SEND;
             command->param0 = 1U;
             return UI_TOUCH_QUICK_SEND;
         }
-        if (Ui_PointInRect(x, y, 28U, 136U, 232U, 54U) != 0U)
+        if (Ui_PointInRect(x, y, UI_QUICK_BTN_X, UI_QUICK_BTN2_Y, UI_QUICK_BTN_W, UI_QUICK_BTN_H) != 0U)
         {
             command->id = APP_CMD_LORA_SEND;
             command->param0 = 2U;
             return UI_TOUCH_QUICK_SEND;
         }
-        if (Ui_PointInRect(x, y, 28U, 202U, 232U, 54U) != 0U)
+        if (Ui_PointInRect(x, y, UI_QUICK_BTN_X, UI_QUICK_BTN3_Y, UI_QUICK_BTN_W, UI_QUICK_BTN_H) != 0U)
         {
             command->id = APP_CMD_LORA_SEND;
             command->param0 = 3U;
             return UI_TOUCH_QUICK_SEND;
         }
+
+        s_view = UI_VIEW_MAIN;
+        return UI_TOUCH_QUICK_BACK;
     }
     else
     {
