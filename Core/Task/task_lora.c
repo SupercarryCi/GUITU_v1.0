@@ -22,6 +22,9 @@
  * 具体 SX126x IRQ 读取、清标志和收包都放在任务上下文中完成，避免在 ISR 中跑 SPI。
  */
 
+static LoraPacketMsg_t s_pending_tx_packet;
+static uint8_t s_pending_tx_valid;
+
 int32_t App_LoraHardwareInit(void)
 {
     e22_lora_stm32_hal_config_t port_cfg;
@@ -72,7 +75,8 @@ int32_t App_LoraTransmit(const LoraPacketMsg_t *packet)
         return -1;
     }
 
-    if (e22_lora_tx_is_busy() == true)
+    if ((e22_lora_tx_is_busy() == true) ||
+        (e22_lora_rx_is_active() == true))
     {
         return -2;
     }
@@ -166,26 +170,36 @@ static uint16_t task_lora_build_nav_packet(LoraPacketMsg_t *packet)
     return packet->len;
 }
 
-static void task_lora_send_packet(LoraState_t *lora, const LoraPacketMsg_t *packet)
+static int32_t task_lora_send_packet(LoraState_t *lora, const LoraPacketMsg_t *packet)
 {
+    int32_t result = -4;
+
     if ((lora == 0) || (packet == 0))
     {
-        return;
+        return -1;
     }
 
     if (osMutexAcquire(g_spiLoraMutex, osWaitForever) == osOK)
     {
-        if (App_LoraTransmit(packet) == 0)
+        result = App_LoraTransmit(packet);
+        if (result == 0)
         {
             lora->tx_count++;
         }
-        else
+        else if (result != -2)
         {
+            /* 射频忙或正在接收属于可重试状态，不计为硬错误。 */
             lora->error_count++;
         }
 
         osMutexRelease(g_spiLoraMutex);
     }
+    else
+    {
+        lora->error_count++;
+    }
+
+    return result;
 }
 
 int32_t App_LoraPollRx(LoraPacketMsg_t *packet)
@@ -220,6 +234,62 @@ int32_t App_LoraPollRx(LoraPacketMsg_t *packet)
     memcpy(packet->payload, rx_packet.payload, rx_packet.length);
 
     return (int32_t)packet->len;
+}
+
+static void task_lora_poll_receive(LoraState_t *lora, LoraPacketMsg_t *packet)
+{
+    int32_t rx_result = -1;
+
+    if ((lora == 0) || (packet == 0))
+    {
+        return;
+    }
+
+    memset(packet, 0, sizeof(*packet));
+    if (osMutexAcquire(g_spiLoraMutex, osWaitForever) == osOK)
+    {
+        rx_result = App_LoraPollRx(packet);
+        osMutexRelease(g_spiLoraMutex);
+    }
+
+    if (rx_result > 0)
+    {
+        lora->rx_count++;
+        lora->last_rx = *packet;
+
+        if (osMessageQueuePut(g_loraRxQueue, packet, 0U, 0U) == osOK)
+        {
+            (void)osEventFlagsSet(g_sysEventFlags, SYS_EVT_LORA_RX);
+        }
+        else
+        {
+            /* UI未及时消费时记录队列满，避免接收丢包无迹可查。 */
+            lora->error_count++;
+        }
+    }
+    else if (rx_result < 0)
+    {
+        lora->error_count++;
+    }
+}
+
+static void task_lora_get_radio_state(LoraState_t *lora,
+                                      uint8_t *tx_busy,
+                                      uint8_t *rx_active)
+{
+    *tx_busy = 1U;
+    *rx_active = 1U;
+
+    if (osMutexAcquire(g_spiLoraMutex, osWaitForever) == osOK)
+    {
+        *tx_busy = (e22_lora_tx_is_busy() == true) ? 1U : 0U;
+        *rx_active = (e22_lora_rx_is_active() == true) ? 1U : 0U;
+        osMutexRelease(g_spiLoraMutex);
+    }
+    else if (lora != 0)
+    {
+        lora->error_count++;
+    }
 }
 
 int32_t Task_LoraInitHardware(void)
@@ -257,6 +327,8 @@ void Task_LoraEntry(void *argument)
     memset(&lora, 0, sizeof(lora));
 #if (APP_LORA_ENABLE_DEFAULT != 0U)
     next_nav_tx_tick = 0U;
+    memset(&s_pending_tx_packet, 0, sizeof(s_pending_tx_packet));
+    s_pending_tx_valid = 0U;
 #endif
 
     osEventFlagsWait(g_sysEventFlags,
@@ -268,64 +340,75 @@ void Task_LoraEntry(void *argument)
     {
     #if (APP_LORA_ENABLE_DEFAULT != 0U)
         LoraPacketMsg_t packet;
-        uint32_t flags;
         uint32_t now;
         uint32_t wait_timeout;
+        int32_t tx_result;
+        uint8_t tx_busy;
+        uint8_t rx_active;
+        uint8_t radio_started_tx = 0U;
 
-        now = osKernelGetTickCount();
-        
-
-
-
-        /*发送*/
-        if (osMessageQueueGet(g_loraTxQueue, &packet, 0, 0U) == osOK)
-        {
-            task_lora_send_packet(&lora, &packet);
-        }
-
-        if ((int32_t)(now - next_nav_tx_tick) >= 0)
-        {
-            /* 只发送纯数据，坐标单位为mm，yaw单位为0.01度。 */
-            if (task_lora_build_nav_packet(&packet) != 0U)
-            {
-                task_lora_send_packet(&lora, &packet);
-            }
-
-            next_nav_tx_tick = now + APP_LORA_PERIOD_MS;
-        }
-
-
-
-
-        /*接收*/
         now = osKernelGetTickCount();
         wait_timeout = ((int32_t)(next_nav_tx_tick - now) > 0) ?
                        (next_nav_tx_tick - now) : 0U;
-        flags = osEventFlagsWait(g_sysEventFlags,
-                                 SYS_EVT_LORA_DIO1,
-                                 osFlagsWaitAny,
-                                 wait_timeout);
-        if (((flags & osFlagsError) == 0U) && ((flags & SYS_EVT_LORA_DIO1) != 0U))
-        {
-            int32_t rx_result;
 
-            memset(&packet, 0, sizeof(packet));
-            if (osMutexAcquire(g_spiLoraMutex, osWaitForever) == osOK)
+        /*
+         * 先等待DIO1或导航周期，再统一轮询IRQ。即使EXTI漏触发，
+         * 最长也会在下一个500ms导航周期处理已完成的接收。
+         */
+        (void)osEventFlagsWait(g_sysEventFlags,
+                               SYS_EVT_LORA_DIO1,
+                               osFlagsWaitAny,
+                               wait_timeout);
+
+        /*接收*/
+        task_lora_poll_receive(&lora, &packet);
+        task_lora_get_radio_state(&lora, &tx_busy, &rx_active);
+
+        if (s_pending_tx_valid == 0U)
+        {
+            if (osMessageQueueGet(g_loraTxQueue,
+                                  &s_pending_tx_packet,
+                                  0,
+                                  0U) == osOK)
             {
-                rx_result = App_LoraPollRx(&packet);
-                if (rx_result > 0)
-                {
-                    lora.rx_count++;
-                    lora.last_rx = packet;
-                    (void)osMessageQueuePut(g_loraRxQueue, &packet, 0U, 0U);
-                    (void)osEventFlagsSet(g_sysEventFlags, SYS_EVT_LORA_RX);
-                }
-                else if (rx_result < 0)
-                {
-                    lora.error_count++;
-                }
-                osMutexRelease(g_spiLoraMutex);
+                s_pending_tx_valid = 1U;
             }
+        }
+
+        /*发送*/
+        if ((s_pending_tx_valid != 0U) &&
+            (tx_busy == 0U) &&
+            (rx_active == 0U))
+        {
+            tx_result = task_lora_send_packet(&lora, &s_pending_tx_packet);
+            if (tx_result == 0)
+            {
+                s_pending_tx_valid = 0U;
+                radio_started_tx = 1U;
+                tx_busy = 1U;
+            }
+        }
+
+        now = osKernelGetTickCount();
+        if ((int32_t)(now - next_nav_tx_tick) >= 0)
+        {
+            /*
+             * 接收、业务包或上一包发送占用射频时，直接跳过本周期导航包，
+             * 不打断当前收包，也不让导航包挤占业务包。
+             */
+            if ((rx_active == 0U) &&
+                (tx_busy == 0U) &&
+                (radio_started_tx == 0U) &&
+                (s_pending_tx_valid == 0U))
+            {
+                /* 只发送纯数据，坐标单位为mm，yaw单位为0.01度。 */
+                if (task_lora_build_nav_packet(&packet) != 0U)
+                {
+                    (void)task_lora_send_packet(&lora, &packet);
+                }
+            }
+
+            next_nav_tx_tick = now + APP_LORA_PERIOD_MS;
         }
     #else
         osDelay(APP_LORA_PERIOD_MS);

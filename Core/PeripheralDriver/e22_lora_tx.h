@@ -71,6 +71,7 @@ bool e22_lora_tx_is_busy(void);
 bool e22_lora_rx_start(void);
 void e22_lora_rx_stop(void);
 bool e22_lora_rx_available(void);
+bool e22_lora_rx_is_active(void);
 bool e22_lora_rx_read_packet(e22_lora_rx_packet_t *packet);
 bool e22_lora_rx_read(uint8_t *buffer, uint8_t *length, int8_t *rssi_dbm, int8_t *snr_db, int8_t *signal_rssi_dbm);
 void e22_lora_irq_handler(void);

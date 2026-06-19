@@ -23,6 +23,7 @@
 
 #define INS_PDR_HEADING_UPDATE_PERIOD_MS 50U    /* 未判步时也定期刷新行人航向，避免LoRa角度停住。 */
 #define INS_PDR_HEADING_OFFSET_DEG (-18.50f)    /* 手臂佩戴偏差：例如139.00度修正到120.50度 */
+#define INS_PDR_RUN_HEADING_FILTER_ALPHA 0.025f /* 跑步航向圆周EMA系数，200Hz下约200ms平滑。 */
 
 #define INS_PDR_ENABLE_HEADING_SNAP 0U          /* 临时测试功能：1=四向吸附，0=关闭 */
 #define INS_PDR_HEADING_SNAP_DEG 45.0f          /* 小于该偏差时吸附到0/90/-90/-180度 */
@@ -50,6 +51,34 @@ static float task_ins_pdr_normalize_deg(float value)
     return value;
 }
 
+static float task_ins_pdr_filter_run_heading_deg(float heading_deg, PdrMotionMode mode)
+{
+    static float filtered_heading_deg;
+    static uint8_t filter_initialized = 0U;
+    float heading_error_deg;
+
+    if (mode != PDR_MODE_RUN)
+    {
+        /* 行走或静止时直接跟随当前航向，下次跑步从新角度开始滤波。 */
+        filtered_heading_deg = heading_deg;
+        filter_initialized = 0U;
+        return heading_deg;
+    }
+
+    if (filter_initialized == 0U)
+    {
+        filtered_heading_deg = heading_deg;
+        filter_initialized = 1U;
+        return filtered_heading_deg;
+    }
+
+    /* 先归一化角差，避免179度到-179度时沿错误方向滤波。 */
+    heading_error_deg = task_ins_pdr_normalize_deg(heading_deg - filtered_heading_deg);
+    filtered_heading_deg = task_ins_pdr_normalize_deg(
+        filtered_heading_deg + (INS_PDR_RUN_HEADING_FILTER_ALPHA * heading_error_deg));
+
+    return filtered_heading_deg;
+}
 static float task_ins_pdr_snap_heading_deg(float heading_deg)
 {
 #if (INS_PDR_ENABLE_HEADING_SNAP != 0U)
@@ -202,6 +231,7 @@ void Task_Ins_Pdr_Entry(void *argument)
     PdrStepOutput pdr_out;
     pft_input_t pft_in;
     pft_output_t pft_out;
+    float corrected_heading_deg;
     float ped_heading_deg;
 #if (INS_PDR_ENABLE_INS != 0U)
     pin_config_t pin_cfg;
@@ -275,9 +305,22 @@ void Task_Ins_Pdr_Entry(void *argument)
             }
 
             /* 当前调试阶段使用WIT原始yaw，并叠加安装偏移作为PDR航向角。 */
-            ped_heading_deg = task_ins_pdr_snap_heading_deg(
-                task_ins_pdr_normalize_deg(gyro.frame.angle_deg[2] +
-                                           INS_PDR_HEADING_OFFSET_DEG));
+            corrected_heading_deg = task_ins_pdr_normalize_deg(
+                gyro.frame.angle_deg[2] + INS_PDR_HEADING_OFFSET_DEG);
+
+            /*PDR更新,不要问为什么在这里*/
+            pdr_out = pdr_step_update(&s_pdr_det,
+                gyro.frame.acc_raw.x,
+                gyro.frame.acc_raw.y,
+                gyro.frame.acc_raw.z,
+                gyro.frame.gyro_raw.x,
+                gyro.frame.gyro_raw.y,
+                gyro.frame.gyro_raw.z);
+
+            ped_heading_deg = task_ins_pdr_filter_run_heading_deg(
+                corrected_heading_deg, pdr_out.mode);
+            ped_heading_deg = task_ins_pdr_snap_heading_deg(ped_heading_deg);
+
             now_tick = osKernelGetTickCount();
             heading_update_due = ((int32_t)(now_tick - next_heading_update_tick) >= 0) ? 1U : 0U;
 #if (INS_PDR_ENABLE_HEADING_DIAG != 0U)
@@ -290,15 +333,6 @@ void Task_Ins_Pdr_Entry(void *argument)
                 next_heading_diag_tick = now_tick + INS_PDR_HEADING_DIAG_PERIOD_MS;
             }
 #endif
-
-            /*PDR更新,不要问为什么在这里*/
-            pdr_out = pdr_step_update(&s_pdr_det,
-                gyro.frame.acc_raw.x,
-                gyro.frame.acc_raw.y,
-                gyro.frame.acc_raw.z,
-                gyro.frame.gyro_raw.x,
-                gyro.frame.gyro_raw.y,
-                gyro.frame.gyro_raw.z);
 
             selected_delta_m.x = 0.0f;
             selected_delta_m.y = 0.0f;

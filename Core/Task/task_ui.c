@@ -176,6 +176,27 @@
 #define UI_QUICK_HZ_SCALE          2U
 #define UI_QUICK_HZ_SPACING        4U
 
+#define UI_LORA_POPUP_X            54U
+#define UI_LORA_POPUP_Y            76U
+#define UI_LORA_POPUP_W            372U
+#define UI_LORA_POPUP_H            168U
+#define UI_LORA_POPUP_CLOSE_W      28U
+#define UI_LORA_POPUP_CLOSE_H      24U
+#define UI_LORA_POPUP_CLOSE_X      (UI_LORA_POPUP_X + UI_LORA_POPUP_W - UI_LORA_POPUP_CLOSE_W - 10U)
+#define UI_LORA_POPUP_CLOSE_Y      (UI_LORA_POPUP_Y + 10U)
+#define UI_LORA_POPUP_TITLE_X      (UI_LORA_POPUP_X + 18U)
+#define UI_LORA_POPUP_TITLE_Y      (UI_LORA_POPUP_Y + 16U)
+#define UI_LORA_POPUP_TEXT_X       (UI_LORA_POPUP_X + 32U)
+#define UI_LORA_POPUP_TEXT_Y       (UI_LORA_POPUP_Y + 78U)
+#define UI_LORA_POPUP_HZ_TEXT_Y    (UI_LORA_POPUP_TEXT_Y + 2U)
+#define UI_LORA_POPUP_TEXT_MAX     49U
+#define UI_LORA_POPUP_LINE_CHARS   24U
+#define UI_LORA_POPUP_ASCII_LINES  2U
+#define UI_LORA_POPUP_HZ_MAX       6U
+#define UI_LORA_POPUP_HZ_SCALE     2U
+#define UI_LORA_POPUP_BG           UI_RGB565(13U, 20U, 28U)
+#define UI_LORA_POPUP_BORDER       UI_RGB565(96U, 165U, 250U)
+
 #define UI_MAIN_CPU_VALUE          23U
 #define UI_MAIN_RAM_VALUE          58U
 
@@ -208,6 +229,21 @@ typedef struct
     const char *unit;
     uint8_t icon;
 } UiMainStatusLayout_t;
+
+typedef enum
+{
+    UI_LORA_POPUP_NONE = 0,
+    UI_LORA_POPUP_ASCII,
+    UI_LORA_POPUP_HZ
+} UiLoraPopupType_t;
+
+typedef struct
+{
+    UiLoraPopupType_t type;
+    uint8_t hz_count;
+    uint8_t hz[UI_LORA_POPUP_HZ_MAX];
+    char text[UI_LORA_POPUP_TEXT_MAX];
+} UiLoraPopupContent_t;
 static uint8_t s_touchPressed = 0U;//触摸状态量
 static UiView_t s_view = UI_VIEW_MAIN;//视图状态量
 static UiView_t s_lastRenderedView = (UiView_t)0xFFU;//上次渲染的视图状态量，初始值设置为无效值以确保首次渲染
@@ -221,6 +257,11 @@ static uint8_t s_mainBackgroundValid = 0U;
 static uint8_t s_lastSignalValid = 0xFFU;
 static int16_t s_lastSignalDbm = 0;
 static uint32_t s_lastMainBaseDistanceM = 0xFFFFFFFFU;
+static UiLoraPopupContent_t s_loraPopupContent;
+static UiLoraPopupContent_t s_loraPopupPendingContent;
+static uint8_t s_loraPopupActive = 0U;
+static uint8_t s_loraPopupPendingValid = 0U;
+static uint8_t s_loraPopupNeedRedraw = 0U;
 
 static const UiMainStatusLayout_t s_mainStatusLayout[4] =
 {
@@ -590,6 +631,8 @@ static const uint8_t *Ui_Font5x7(char c)//半拉字库
     static const uint8_t minus[7] = {0x00U, 0x00U, 0x00U, 0x1FU, 0x00U, 0x00U, 0x00U};
     static const uint8_t colon[7] = {0x00U, 0x04U, 0x04U, 0x00U, 0x04U, 0x04U, 0x00U};
     static const uint8_t pct[7] = {0x19U, 0x19U, 0x02U, 0x04U, 0x08U, 0x13U, 0x13U};
+    static const uint8_t dot[7] = {0x00U, 0x00U, 0x00U, 0x00U, 0x00U, 0x06U, 0x06U};
+    static const uint8_t comma[7] = {0x00U, 0x00U, 0x00U, 0x00U, 0x00U, 0x06U, 0x04U};
     static const uint8_t n0[7] = {0x0EU, 0x11U, 0x13U, 0x15U, 0x19U, 0x11U, 0x0EU};
     static const uint8_t n1[7] = {0x04U, 0x0CU, 0x04U, 0x04U, 0x04U, 0x04U, 0x0EU};
     static const uint8_t n2[7] = {0x0EU, 0x11U, 0x01U, 0x02U, 0x04U, 0x08U, 0x1FU};
@@ -605,9 +648,11 @@ static const uint8_t *Ui_Font5x7(char c)//半拉字库
     static const uint8_t C[7] = {0x0EU, 0x11U, 0x10U, 0x10U, 0x10U, 0x11U, 0x0EU};
     static const uint8_t D[7] = {0x1EU, 0x11U, 0x11U, 0x11U, 0x11U, 0x11U, 0x1EU};
     static const uint8_t E[7] = {0x1FU, 0x10U, 0x10U, 0x1EU, 0x10U, 0x10U, 0x1FU};
+    static const uint8_t F[7] = {0x1FU, 0x10U, 0x10U, 0x1EU, 0x10U, 0x10U, 0x10U};
     static const uint8_t G[7] = {0x0EU, 0x11U, 0x10U, 0x17U, 0x11U, 0x11U, 0x0FU};
     static const uint8_t H[7] = {0x11U, 0x11U, 0x11U, 0x1FU, 0x11U, 0x11U, 0x11U};
     static const uint8_t I[7] = {0x0EU, 0x04U, 0x04U, 0x04U, 0x04U, 0x04U, 0x0EU};
+    static const uint8_t J[7] = {0x07U, 0x02U, 0x02U, 0x02U, 0x12U, 0x12U, 0x0CU};
     static const uint8_t K[7] = {0x11U, 0x12U, 0x14U, 0x18U, 0x14U, 0x12U, 0x11U};
     static const uint8_t L[7] = {0x10U, 0x10U, 0x10U, 0x10U, 0x10U, 0x10U, 0x1FU};
     static const uint8_t M[7] = {0x11U, 0x1BU, 0x15U, 0x15U, 0x11U, 0x11U, 0x11U};
@@ -620,14 +665,18 @@ static const uint8_t *Ui_Font5x7(char c)//半拉字库
     static const uint8_t T[7] = {0x1FU, 0x04U, 0x04U, 0x04U, 0x04U, 0x04U, 0x04U};
     static const uint8_t U[7] = {0x11U, 0x11U, 0x11U, 0x11U, 0x11U, 0x11U, 0x0EU};
     static const uint8_t V[7] = {0x11U, 0x11U, 0x11U, 0x11U, 0x11U, 0x0AU, 0x04U};
+    static const uint8_t W[7] = {0x11U, 0x11U, 0x11U, 0x15U, 0x15U, 0x1BU, 0x11U};
     static const uint8_t X[7] = {0x11U, 0x11U, 0x0AU, 0x04U, 0x0AU, 0x11U, 0x11U};
     static const uint8_t Y[7] = {0x11U, 0x11U, 0x0AU, 0x04U, 0x04U, 0x04U, 0x04U};
+    static const uint8_t Z[7] = {0x1FU, 0x01U, 0x02U, 0x04U, 0x08U, 0x10U, 0x1FU};
 
     switch (c)
     {
         case '-': return minus;
         case ':': return colon;
         case '%': return pct;
+        case '.': return dot;
+        case ',': return comma;
         case '0': return n0;
         case '1': return n1;
         case '2': return n2;
@@ -643,9 +692,11 @@ static const uint8_t *Ui_Font5x7(char c)//半拉字库
         case 'C': return C;
         case 'D': return D;
         case 'E': return E;
+        case 'F': return F;
         case 'G': return G;
         case 'H': return H;
         case 'I': return I;
+        case 'J': return J;
         case 'K': return K;
         case 'L': return L;
         case 'M': return M;
@@ -658,8 +709,10 @@ static const uint8_t *Ui_Font5x7(char c)//半拉字库
         case 'T': return T;
         case 'U': return U;
         case 'V': return V;
+        case 'W': return W;
         case 'X': return X;
         case 'Y': return Y;
+        case 'Z': return Z;
         default: return blank;
     }
 }
@@ -758,6 +811,19 @@ typedef enum
     UI_HZ_YU,
     UI_HZ_AN,
     UI_HZ_QUAN,
+    UI_HZ_FAN,
+    UI_HZ_HANG,
+    UI_HZ_CUN,
+    UI_HZ_ZAI,
+    UI_HZ_BAO_ZHA,
+    UI_HZ_ZHA,
+    UI_HZ_FENG,
+    UI_HZ_JIE_GOU,
+    UI_HZ_GOU,
+    UI_HZ_QING_KUANG,
+    UI_HZ_KUANG,
+    UI_HZ_SHANG,
+    UI_HZ_BAO_REPORT,
     UI_HZ_COUNT
 } UiHzGlyphId_t;
 
@@ -776,7 +842,31 @@ static const uint16_t s_uiHzGlyph[UI_HZ_COUNT][16] =
     {0x0000U, 0x3FFCU, 0x3000U, 0x3010U, 0x3630U, 0x31A0U, 0x30C0U, 0x30E0U, 0x31B0U, 0x3318U, 0x3400U, 0x3000U, 0x3FFCU, 0x0000U, 0x0000U, 0x0000U},
     {0x0000U, 0x1028U, 0x1028U, 0x17FCU, 0x1020U, 0x3BACU, 0x12A8U, 0x12A8U, 0x12A8U, 0x1110U, 0x3810U, 0x27BCU, 0x004CU, 0x0000U, 0x0000U, 0x0000U},
     {0x0000U, 0x0100U, 0x0100U, 0x1EF8U, 0x1108U, 0x0200U, 0x3FFCU, 0x0420U, 0x0420U, 0x0F40U, 0x00E0U, 0x0338U, 0x1C0CU, 0x0000U, 0x0000U, 0x0000U},
-    {0x0000U, 0x0180U, 0x0380U, 0x0640U, 0x0C30U, 0x381CU, 0x2FF4U, 0x0080U, 0x0080U, 0x0FF8U, 0x0080U, 0x0080U, 0x3FF8U, 0x0000U, 0x0000U, 0x0000U}
+    {0x0000U, 0x0180U, 0x0380U, 0x0640U, 0x0C30U, 0x381CU, 0x2FF4U, 0x0080U, 0x0080U, 0x0FF8U, 0x0080U, 0x0080U, 0x3FF8U, 0x0000U, 0x0000U, 0x0000U},
+    {0x0801U, 0x0CFFU, 0x04C0U, 0x00C0U, 0x00FFU, 0x00C2U, 0x1CD2U, 0x04FAU, 0x048EU, 0x048EU, 0x059BU, 0x0571U, 0x0E00U, 0x19FFU, 0x0000U, 0x0000U},
+    {0x0218U, 0x0408U, 0x0F88U, 0x09FFU, 0x0D80U, 0x0B80U, 0x09BEU, 0x1FB2U, 0x09B2U, 0x0DB2U, 0x0BA2U, 0x09A2U, 0x11A2U, 0x1343U, 0x10C0U, 0x0000U},
+    /* 存 */
+    {0x3FFFU, 0x0200U, 0x0200U, 0x04FEU, 0x0404U, 0x0C08U, 0x1410U, 0x25FFU, 0x0410U, 0x0410U, 0x0410U, 0x0410U, 0x0450U, 0x0420U, 0x0000U, 0x0000U},
+    /* 在 */
+    {0x0100U, 0x3FFFU, 0x0200U, 0x0210U, 0x0410U, 0x0C10U, 0x15FFU, 0x2410U, 0x0410U, 0x0410U, 0x0410U, 0x0410U, 0x07FFU, 0x0400U, 0x0000U, 0x0000U},
+    /* 爆 */
+    {0x047FU, 0x0541U, 0x167FU, 0x1422U, 0x14FFU, 0x2422U, 0x05FFU, 0x0422U, 0x0449U, 0x0AAAU, 0x091CU, 0x102AU, 0x1049U, 0x2018U, 0x0000U, 0x0000U},
+    /* 炸 */
+    {0x0440U, 0x057FU, 0x16A0U, 0x14A0U, 0x1520U, 0x243EU, 0x0420U, 0x0420U, 0x0420U, 0x0A3FU, 0x0920U, 0x1120U, 0x1020U, 0x2020U, 0x0000U, 0x0000U},
+    /* 风 */
+    {0x0804U, 0x0804U, 0x0A14U, 0x0914U, 0x08A4U, 0x08A4U, 0x0844U, 0x0844U, 0x08A4U, 0x08A4U, 0x0912U, 0x1212U, 0x1001U, 0x2000U, 0x0000U, 0x0000U},
+    /* 结 */
+    {0x0808U, 0x09FFU, 0x1108U, 0x3E08U, 0x047FU, 0x0800U, 0x1000U, 0x3F7FU, 0x1041U, 0x0041U, 0x0741U, 0x3841U, 0x107FU, 0x0041U, 0x0000U, 0x0000U},
+    /* 构 */
+    {0x0420U, 0x043FU, 0x3F41U, 0x0441U, 0x0C91U, 0x0E11U, 0x1521U, 0x1529U, 0x2445U, 0x047DU, 0x0405U, 0x0401U, 0x040AU, 0x0404U, 0x0000U, 0x0000U},
+    /* 情 */
+    {0x05FFU, 0x0410U, 0x06FEU, 0x1510U, 0x15FFU, 0x1400U, 0x24FEU, 0x0482U, 0x04FEU, 0x0482U, 0x04FEU, 0x0482U, 0x048AU, 0x0484U, 0x0000U, 0x0000U},
+    /* 况 */
+    {0x0902U, 0x0902U, 0x0102U, 0x0102U, 0x05FEU, 0x0448U, 0x0848U, 0x3848U, 0x0848U, 0x0888U, 0x0888U, 0x0908U, 0x0A07U, 0x0400U, 0x0000U, 0x0000U},
+    /* 上 */
+    {0x0080U, 0x0080U, 0x0080U, 0x0080U, 0x00FEU, 0x0080U, 0x0080U, 0x0080U, 0x0080U, 0x0080U, 0x0080U, 0x0080U, 0x3FFFU, 0x0000U, 0x0000U, 0x0000U},
+    /* 报 */
+    {0x0441U, 0x0441U, 0x3F45U, 0x0442U, 0x0440U, 0x057FU, 0x0651U, 0x0C51U, 0x344AU, 0x044AU, 0x0444U, 0x044AU, 0x1451U, 0x0860U, 0x0000U, 0x0000U}
 };
 
 static void Ui_DrawHzGlyph(uint16_t x, uint16_t y, uint8_t glyph_id, uint8_t scale, uint16_t color)
@@ -1144,6 +1234,267 @@ static void Ui_DrawQuickView(void)
     Ui_DrawQuickButton(UI_QUICK_BTN3_Y, safe, (uint8_t)sizeof(safe));        //安全区域
 }
 
+static void Ui_LoraPopupSetHz(UiLoraPopupContent_t *content, const uint8_t *hz, uint8_t count)
+{
+    if ((content == NULL) || (hz == NULL) || (count > UI_LORA_POPUP_HZ_MAX))
+    {
+        return;
+    }
+
+    memset(content, 0, sizeof(*content));
+    content->type = UI_LORA_POPUP_HZ;
+    content->hz_count = count;
+    memcpy(content->hz, hz, count);
+}
+
+static char Ui_LoraPopupNormalizeChar(uint8_t data)
+{
+    if ((data >= (uint8_t)'a') && (data <= (uint8_t)'z'))
+    {
+        data = (uint8_t)(data - (uint8_t)('a' - 'A'));
+    }
+
+    if (((data >= (uint8_t)'A') && (data <= (uint8_t)'Z')) ||
+        ((data >= (uint8_t)'0') && (data <= (uint8_t)'9')) ||
+        (data == (uint8_t)' ') || (data == (uint8_t)'-') ||
+        (data == (uint8_t)':') || (data == (uint8_t)'%') ||
+        (data == (uint8_t)',') || (data == (uint8_t)'.'))
+    {
+        return (char)data;
+    }
+
+    return '.';
+}
+
+static void Ui_LoraPopupSetAscii(UiLoraPopupContent_t *content, const uint8_t *data, uint16_t len)
+{
+    uint16_t i;
+    uint16_t out_len;
+
+    if (content == NULL)
+    {
+        return;
+    }
+
+    memset(content, 0, sizeof(*content));
+    content->type = UI_LORA_POPUP_ASCII;
+
+    if ((data == NULL) || (len == 0U))
+    {
+        (void)snprintf(content->text, sizeof(content->text), "EMPTY");
+        return;
+    }
+
+    out_len = (len < (UI_LORA_POPUP_TEXT_MAX - 1U)) ? len : (UI_LORA_POPUP_TEXT_MAX - 1U);
+    for (i = 0U; i < out_len; i++)
+    {
+        content->text[i] = Ui_LoraPopupNormalizeChar(data[i]);
+    }
+    content->text[out_len] = '\0';
+}
+
+static void Ui_LoraPopupParsePacket(const LoraPacketMsg_t *packet, UiLoraPopupContent_t *content)
+{
+    static const uint8_t explosion_risk[] =
+    {
+        UI_HZ_CUN, UI_HZ_ZAI, UI_HZ_BAO_ZHA, UI_HZ_ZHA, UI_HZ_FENG, UI_HZ_XIAN
+    };
+    static const uint8_t structure_risk[] =
+    {
+        UI_HZ_CUN, UI_HZ_ZAI, UI_HZ_JIE_GOU, UI_HZ_GOU, UI_HZ_FENG, UI_HZ_XIAN
+    };
+    static const uint8_t status_report[] =
+    {
+        UI_HZ_QING_KUANG, UI_HZ_KUANG, UI_HZ_SHANG, UI_HZ_BAO_REPORT
+    };
+    static const uint8_t return_req[] = {UI_HZ_FAN, UI_HZ_HANG, UI_HZ_QING, UI_HZ_QIU};
+
+    if ((packet == NULL) || (content == NULL))
+    {
+        return;
+    }
+
+    if (packet->len == 1U)
+    {
+        switch (packet->payload[0])
+        {
+            case (uint8_t)'1':
+                Ui_LoraPopupSetHz(content, explosion_risk, (uint8_t)sizeof(explosion_risk));
+                return;
+            case (uint8_t)'2':
+                Ui_LoraPopupSetHz(content, structure_risk, (uint8_t)sizeof(structure_risk));
+                return;
+            case (uint8_t)'3':
+                Ui_LoraPopupSetHz(content, status_report, (uint8_t)sizeof(status_report));
+                return;
+            case (uint8_t)'R':
+                Ui_LoraPopupSetHz(content, return_req, (uint8_t)sizeof(return_req));
+                return;
+            default:
+                break;
+        }
+    }
+
+    Ui_LoraPopupSetAscii(content, packet->payload, packet->len);
+}
+
+static void Ui_LoraPopupPush(const UiLoraPopupContent_t *content)
+{
+    if ((content == NULL) || (content->type == UI_LORA_POPUP_NONE))
+    {
+        return;
+    }
+
+    if (s_loraPopupActive != 0U)
+    {
+        s_loraPopupPendingContent = *content;
+        s_loraPopupPendingValid = 1U;
+        return;
+    }
+
+    s_loraPopupContent = *content;
+    s_loraPopupActive = 1U;
+    s_loraPopupNeedRedraw = 1U;
+}
+
+static void Ui_ProcessLoraRxQueue(void)
+{
+    LoraPacketMsg_t packet;
+    UiLoraPopupContent_t content;
+
+    if (g_loraRxQueue == NULL)
+    {
+        return;
+    }
+
+    if (s_view != UI_VIEW_MAIN)
+    {
+        while (osMessageQueueGet(g_loraRxQueue, &packet, 0, 0U) == osOK)
+        {
+        }
+        s_loraPopupActive = 0U;
+        s_loraPopupPendingValid = 0U;
+        s_loraPopupNeedRedraw = 0U;
+        return;
+    }
+
+    while (osMessageQueueGet(g_loraRxQueue, &packet, 0, 0U) == osOK)
+    {
+        memset(&content, 0, sizeof(content));
+        Ui_LoraPopupParsePacket(&packet, &content);
+        Ui_LoraPopupPush(&content);
+    }
+}
+
+static void Ui_DrawRectBorder(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t thickness, uint16_t color)
+{
+    uint16_t i;
+
+    if ((w == 0U) || (h == 0U) || (thickness == 0U))
+    {
+        return;
+    }
+
+    for (i = 0U; i < thickness; i++)
+    {
+        (void)ILI9488_FillRect(&g_lcd, x, (uint16_t)(y + i), w, 1U, color);
+        (void)ILI9488_FillRect(&g_lcd, x, (uint16_t)(y + h - 1U - i), w, 1U, color);
+        (void)ILI9488_FillRect(&g_lcd, (uint16_t)(x + i), y, 1U, h, color);
+        (void)ILI9488_FillRect(&g_lcd, (uint16_t)(x + w - 1U - i), y, 1U, h, color);
+    }
+}
+
+static void Ui_DrawLoraPopupAscii(const char *text)
+{
+    char line[UI_LORA_POPUP_LINE_CHARS + 1U];
+    uint8_t row;
+    uint8_t col;
+    uint8_t src;
+
+    if (text == NULL)
+    {
+        return;
+    }
+
+    src = 0U;
+    for (row = 0U; row < UI_LORA_POPUP_ASCII_LINES; row++)
+    {
+        col = 0U;
+        while ((col < UI_LORA_POPUP_LINE_CHARS) && (text[src] != '\0'))
+        {
+            line[col] = text[src];
+            col++;
+            src++;
+        }
+        line[col] = '\0';
+
+        if (col != 0U)
+        {
+            Ui_DrawText(UI_LORA_POPUP_TEXT_X,
+                        (uint16_t)(UI_LORA_POPUP_TEXT_Y + ((uint16_t)row * 26U)),
+                        line,
+                        2U,
+                        UI_COLOR_TEXT);
+        }
+
+        if (text[src] == '\0')
+        {
+            break;
+        }
+    }
+}
+
+static void Ui_DrawLoraPopup(void)
+{
+    (void)ILI9488_FillRect(&g_lcd, UI_LORA_POPUP_X, UI_LORA_POPUP_Y, UI_LORA_POPUP_W, UI_LORA_POPUP_H, UI_LORA_POPUP_BG);
+    Ui_DrawRectBorder(UI_LORA_POPUP_X, UI_LORA_POPUP_Y, UI_LORA_POPUP_W, UI_LORA_POPUP_H, 2U, UI_LORA_POPUP_BORDER);
+    Ui_DrawText(UI_LORA_POPUP_TITLE_X, UI_LORA_POPUP_TITLE_Y, "LORA RX", 2U, UI_LORA_POPUP_BORDER);
+
+    Ui_DrawRectBorder(UI_LORA_POPUP_CLOSE_X, UI_LORA_POPUP_CLOSE_Y, UI_LORA_POPUP_CLOSE_W, UI_LORA_POPUP_CLOSE_H, 2U, UI_COLOR_HR);
+    Ui_DrawText((uint16_t)(UI_LORA_POPUP_CLOSE_X + 9U),
+                (uint16_t)(UI_LORA_POPUP_CLOSE_Y + 5U),
+                "X",
+                2U,
+                UI_COLOR_HR);
+
+    if (s_loraPopupContent.type == UI_LORA_POPUP_HZ)
+    {
+        Ui_DrawHzTextCentered(UI_LORA_POPUP_X,
+                              UI_LORA_POPUP_HZ_TEXT_Y,
+                              UI_LORA_POPUP_W,
+                              s_loraPopupContent.hz,
+                              s_loraPopupContent.hz_count,
+                              UI_LORA_POPUP_HZ_SCALE,
+                              UI_COLOR_TEXT);
+    }
+    else
+    {
+        Ui_DrawLoraPopupAscii(s_loraPopupContent.text);
+    }
+
+    s_loraPopupNeedRedraw = 0U;
+}
+
+static void Ui_LoraPopupClose(void)
+{
+    if (s_loraPopupPendingValid != 0U)
+    {
+        s_loraPopupContent = s_loraPopupPendingContent;
+        memset(&s_loraPopupPendingContent, 0, sizeof(s_loraPopupPendingContent));
+        s_loraPopupPendingValid = 0U;
+        s_loraPopupActive = 1U;
+        s_loraPopupNeedRedraw = 1U;
+        return;
+    }
+
+    memset(&s_loraPopupContent, 0, sizeof(s_loraPopupContent));
+    s_loraPopupActive = 0U;
+    s_loraPopupNeedRedraw = 0U;
+    s_mainBackgroundValid = 0U;
+    s_mainValueValid = 0U;
+    s_lastRenderedView = (UiView_t)0xFFU;
+}
+
 static void Ui_DrawReturnView(const AppSnapshot_t *snapshot, uint8_t full_redraw)
 {
     char text[24];
@@ -1211,6 +1562,15 @@ static UiTouchAction_t Ui_HandleTouch(uint16_t x, uint16_t y, AppCommandMsg_t *c
 
     if (s_view == UI_VIEW_MAIN)
     {
+        if (s_loraPopupActive != 0U)
+        {
+            if (Ui_PointInRect(x, y, UI_LORA_POPUP_CLOSE_X, UI_LORA_POPUP_CLOSE_Y, UI_LORA_POPUP_CLOSE_W, UI_LORA_POPUP_CLOSE_H) != 0U)
+            {
+                Ui_LoraPopupClose();
+            }
+            return UI_TOUCH_NONE;
+        }
+
         if (Ui_PointInRect(x, y, UI_MAIN_BASE_X, UI_MAIN_BASE_Y, UI_MAIN_BASE_W, UI_MAIN_BASE_H) != 0U)
         {
             s_view = UI_VIEW_QUICK;
@@ -1285,6 +1645,8 @@ void App_UiRender(const AppSnapshot_t *snapshot)
         return;
     }
 
+    Ui_ProcessLoraRxQueue();
+
     full_redraw = 0U;
     if (s_lastRenderedView != s_view)
     {
@@ -1311,6 +1673,19 @@ void App_UiRender(const AppSnapshot_t *snapshot)
 
     if (s_view == UI_VIEW_MAIN)
     {
+        if (s_loraPopupActive != 0U)
+        {
+            if (full_redraw != 0U)
+            {
+                Ui_DrawMainView(snapshot, full_redraw);
+            }
+            if ((s_loraPopupNeedRedraw != 0U) || (full_redraw != 0U))
+            {
+                Ui_DrawLoraPopup();
+            }
+            return;
+        }
+
         Ui_DrawMainView(snapshot, full_redraw);
     }
     else if (s_view == UI_VIEW_QUICK)

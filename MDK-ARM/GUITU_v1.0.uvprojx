@@ -1541,6 +1541,16 @@
               <FilePath>..\Core\PeripheralDriver\tft_port_stm32_hal.h</FilePath>
             </File>
             <File>
+              <FileName>max30102.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\PeripheralDriver\max30102.c</FilePath>
+            </File>
+            <File>
+              <FileName>max30102.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Core\PeripheralDriver\max30102.h</FilePath>
+            </File>
+            <File>
               <FileName>compass_icons.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\compass_icon_c\compass_icons.c</FilePath>

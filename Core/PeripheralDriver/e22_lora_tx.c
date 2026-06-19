@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <string.h>
 
+#define E22_LORA_RX_ACTIVITY_TIMEOUT_MS 2000U
+
 typedef struct
 {
     bool is_initialized;
@@ -11,6 +13,8 @@ typedef struct
     bool is_rx_enabled;
     bool resume_rx_after_tx;
     bool rx_ready;
+    bool rx_active;
+    uint32_t rx_active_start_tick;
     uint8_t rx_buffer[E22_LORA_MAX_PAYLOAD_LEN];
     uint8_t rx_length;
     int8_t rx_rssi_dbm;
@@ -66,8 +70,7 @@ void e22_lora_tx_rf_switch_close(void)
 static bool e22_lora_spi_check(void)
 {
     uint8_t temp = 0xA5U;
-
-    /* 0x06BB æ˜¯ SX126x å¯è¯»å†™å¯„å­˜å™¨ï¼Œç”¨æ¥åšåŸºç¡€ SPI é€šä¿¡æ£€æŸ¥ã€‚ */
+    /* 0x06BBÊÇSX126x¿É¶ÁÐ´¼Ä´æÆ÷£¬ÓÃÓÚ»ù´¡SPIÍ¨ÐÅ¼ì²é¡£ */
     sx126x_write_register(&e22_context, 0x06BB, &temp, 1U);
     temp = 0U;
     sx126x_read_register(&e22_context, 0x06BB, &temp, 1U);
@@ -165,17 +168,19 @@ bool e22_lora_tx_send(const uint8_t *payload, uint8_t length)
     {
         return false;
     }
-
-    /* å‘é€å‰å…ˆå¤„ç†å¯èƒ½å·²ç»åˆ°æ¥çš„ RX_DONEï¼Œé¿å…æ¸… IRQ æ—¶ä¸¢æŽ‰åˆšæ”¶åˆ°çš„åŒ…ã€‚ */
+    /* ·¢ËÍÇ°´¦Àí¿ÉÄÜÒÑµ½´ïµÄRX_DONE£¬±ÜÃâÇå³ýIRQÊ±¶ªÊ§¸ÕÊÕµ½µÄÊý¾Ý°ü¡£ */
     e22_lora_irq_handler();
 
-    if (e22_lora_tx_is_busy() == true)
+    if ((e22_lora_tx_is_busy() == true) ||
+        (e22_lora_rx_is_active() == true))
     {
         return false;
     }
 
     e22_context.resume_rx_after_tx = e22_context.is_rx_enabled;
     e22_context.is_rx_enabled = false;
+    e22_context.rx_active = false;
+    e22_context.rx_active_start_tick = 0U;
 
     pkt_cfg.pld_len_in_bytes = length;
     sx126x_set_lora_pkt_params(&e22_context, &pkt_cfg);
@@ -223,6 +228,9 @@ bool e22_lora_tx_is_busy(void)
 
 static bool e22_lora_config_rx_continuous(void)
 {
+    e22_context.rx_active = false;
+    e22_context.rx_active_start_tick = 0U;
+
     pkt_cfg.pld_len_in_bytes = E22_LORA_MAX_PAYLOAD_LEN;
     sx126x_set_lora_pkt_params(&e22_context, &pkt_cfg);
 
@@ -273,6 +281,8 @@ void e22_lora_rx_stop(void)
     sx126x_set_standby(&e22_context, SX126X_STANDBY_CFG_RC);
     e22_context.is_rx_enabled = false;
     e22_context.resume_rx_after_tx = false;
+    e22_context.rx_active = false;
+    e22_context.rx_active_start_tick = 0U;
     e22_lora_tx_rf_switch_close();
 }
 
@@ -285,6 +295,31 @@ bool e22_lora_rx_available(void)
 
     e22_lora_irq_handler();
     return e22_context.rx_ready;
+}
+
+bool e22_lora_rx_is_active(void)
+{
+    if (e22_context.is_initialized == false)
+    {
+        return false;
+    }
+
+    e22_lora_irq_handler();
+
+    if ((e22_context.rx_active == true) &&
+        ((e22_lora_port_get_tick_ms() - e22_context.rx_active_start_tick) >
+         E22_LORA_RX_ACTIVITY_TIMEOUT_MS))
+    {
+        /* Òì³£Ç°µ¼Âë²»ÄÜÓÀ¾Ã×èÖ¹·¢ËÍ£¬³¬Ê±ºóÖØÐÂ½øÈëÁ¬Ðø½ÓÊÕ¡£ */
+        e22_context.rx_active = false;
+        e22_context.rx_active_start_tick = 0U;
+        if ((e22_context.is_rx_enabled == true) && (e22_context.is_tx == false))
+        {
+            (void)e22_lora_config_rx_continuous();
+        }
+    }
+
+    return e22_context.rx_active;
 }
 
 bool e22_lora_rx_read_packet(e22_lora_rx_packet_t *packet)
@@ -434,6 +469,11 @@ void e22_lora_irq_handler(void)
     if ((irq_mask & SX126X_IRQ_PREAMBLE_DETECTED) != 0U)
     {
         e22_diag.preamble_count++;
+        if ((e22_context.is_rx_enabled == true) && (e22_context.is_tx == false))
+        {
+            e22_context.rx_active = true;
+            e22_context.rx_active_start_tick = e22_lora_port_get_tick_ms();
+        }
     }
     if ((irq_mask & SX126X_IRQ_CRC_ERROR) != 0U)
     {
@@ -448,9 +488,24 @@ void e22_lora_irq_handler(void)
         e22_diag.timeout_count++;
     }
 
+    if ((irq_mask & (SX126X_IRQ_RX_DONE | SX126X_IRQ_CRC_ERROR |
+                     SX126X_IRQ_HEADER_ERROR | SX126X_IRQ_TIMEOUT)) != 0U)
+    {
+        e22_context.rx_active = false;
+        e22_context.rx_active_start_tick = 0U;
+    }
+
     if ((irq_mask & SX126X_IRQ_RX_DONE) != 0U)
     {
         e22_lora_handle_rx_done(irq_mask);
+    }
+    else if (((irq_mask & (SX126X_IRQ_CRC_ERROR | SX126X_IRQ_HEADER_ERROR |
+                           SX126X_IRQ_TIMEOUT)) != 0U) &&
+             (e22_context.is_rx_enabled == true) &&
+             (e22_context.is_tx == false))
+    {
+        /* ´í°ü»ò½ÓÊÕ³¬Ê±ºóÖØÐÂ½øÈëÁ¬Ðø½ÓÊÕ£¬µÈ´ýÏÂÒ»¸öÓÐÐ§°ü¡£ */
+        (void)e22_lora_config_rx_continuous();
     }
 
     if ((irq_mask & SX126X_IRQ_TX_DONE) != 0U)
