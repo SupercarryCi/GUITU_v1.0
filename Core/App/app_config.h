@@ -46,6 +46,15 @@ extern "C" {
 #define APP_LORA_PERIOD_MS          500U        /* LoRa 导航位置发送/收发轮询周期 (2Hz) */
 #define APP_RETURN_PERIOD_MS        100U        /* 返航控制周期 (10Hz) */
 
+/* 气体报警阈值，传感器标定后只需要调整这里。 */
+#define APP_GAS_NGAS_ALARM_THRESHOLD_PPM 50000.0f
+#define APP_GAS_LPG_ALARM_THRESHOLD_PPM  50000.0f
+
+/* 蜂鸣器为 PE8 GPIO 输出，默认高电平响。若硬件为低电平响，在这里对调。 */
+#define APP_BUZZER_ACTIVE_STATE          GPIO_PIN_SET
+#define APP_BUZZER_INACTIVE_STATE        GPIO_PIN_RESET
+#define APP_BUZZER_TIMER_PERIOD_MS       50U
+
 /* LoRa 当前只预留框架，默认不启用真实收发任务。 */
 #define APP_LORA_ENABLE_DEFAULT     1U
 

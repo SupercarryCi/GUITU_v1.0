@@ -1,6 +1,7 @@
 #include "task_ui.h"
 
 #include "app_config.h"
+#include "app_buzzer.h"
 #include "app_event.h"
 #include "app_msg.h"
 #include "app_rtos.h"
@@ -1344,6 +1345,8 @@ static void Ui_LoraPopupPush(const UiLoraPopupContent_t *content)
     {
         return;
     }
+
+    App_BuzzerRequestLoraPopup();
 
     if (s_loraPopupActive != 0U)
     {

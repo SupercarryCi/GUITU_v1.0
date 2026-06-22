@@ -1326,6 +1326,16 @@
           <GroupName>App</GroupName>
           <Files>
             <File>
+              <FileName>app_buzzer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\App\app_buzzer.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_buzzer.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Core\App\app_buzzer.h</FilePath>
+            </File>
+            <File>
               <FileName>app_config.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\Core\App\app_config.h</FilePath>

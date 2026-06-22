@@ -10,7 +10,16 @@
 #include <string.h>
 
 #define TASK_SPO2_RECALC_SAMPLES     100U
-#define TASK_SPO2_HR_MAX_BPM         240
+#define TASK_SPO2_DISPLAY_MIN        60U
+#define TASK_SPO2_DISPLAY_MAX        160U
+#define TASK_SPO2_DISPLAY_DELTA_MAX  10U
+#define TASK_SPO2_RELOCK_COUNT       3U
+
+typedef struct
+{
+    uint16_t value;
+    uint8_t count;
+} TaskSpo2Candidate_t;
 
 static uint32_t s_spo2_red_buffer[MAX30102_ALGO_BUFFER_SIZE];
 static uint32_t s_spo2_ir_buffer[MAX30102_ALGO_BUFFER_SIZE];
@@ -20,6 +29,11 @@ static uint16_t s_spo2_write_index = 0U;
 static uint16_t s_spo2_sample_count = 0U;
 static uint16_t s_spo2_samples_since_calc = 0U;
 static uint8_t s_spo2_has_first_result = 0U;
+static Spo2State_t s_spo2_display_state;
+static uint8_t s_spo2_has_display_spo2 = 0U;
+static uint8_t s_spo2_has_display_hr = 0U;
+static TaskSpo2Candidate_t s_spo2_candidate;
+static TaskSpo2Candidate_t s_hr_candidate;
 
 static void Task_Spo2ResetBuffer(void)
 {
@@ -31,6 +45,11 @@ static void Task_Spo2ResetBuffer(void)
     s_spo2_sample_count = 0U;
     s_spo2_samples_since_calc = 0U;
     s_spo2_has_first_result = 0U;
+    memset(&s_spo2_display_state, 0, sizeof(s_spo2_display_state));
+    s_spo2_has_display_spo2 = 0U;
+    s_spo2_has_display_hr = 0U;
+    memset(&s_spo2_candidate, 0, sizeof(s_spo2_candidate));
+    memset(&s_hr_candidate, 0, sizeof(s_hr_candidate));
 }
 
 static void Task_Spo2StoreSample(uint32_t red, uint32_t ir)
@@ -115,25 +134,103 @@ static uint16_t Task_Spo2EstimatePerfusion(void)
     return (uint16_t)perfusion;
 }
 
+static uint8_t Task_Spo2IsDisplayValueAllowed(uint16_t value,
+                                               uint16_t last_value,
+                                               uint8_t has_last,
+                                               TaskSpo2Candidate_t *candidate)
+{
+    uint16_t diff;
+
+    if ((value < TASK_SPO2_DISPLAY_MIN) || (value > TASK_SPO2_DISPLAY_MAX))
+    {
+        candidate->count = 0U;
+        return 0U;
+    }
+
+    if (has_last == 0U)
+    {
+        candidate->count = 0U;
+        return 1U;
+    }
+
+    diff = (value > last_value) ? (uint16_t)(value - last_value) : (uint16_t)(last_value - value);
+    if (diff <= TASK_SPO2_DISPLAY_DELTA_MAX)
+    {
+        candidate->count = 0U;
+        return 1U;
+    }
+
+    if (candidate->count == 0U)
+    {
+        candidate->value = value;
+        candidate->count = 1U;
+        return 0U;
+    }
+
+    diff = (value > candidate->value) ? (uint16_t)(value - candidate->value)
+                                      : (uint16_t)(candidate->value - value);
+    if (diff > TASK_SPO2_DISPLAY_DELTA_MAX)
+    {
+        candidate->value = value;
+        candidate->count = 1U;
+        return 0U;
+    }
+
+    candidate->count++;
+    if (candidate->count < TASK_SPO2_RELOCK_COUNT)
+    {
+        return 0U;
+    }
+
+    /* 连续稳定的新数据确认后重新锁定，避免显示值永久停留在旧区间。 */
+    candidate->count = 0U;
+    return 1U;
+}
+
 static void Task_Spo2FillOutput(Spo2State_t *sample,
                                 int32_t spo2,
                                 int8_t spo2_valid,
                                 int32_t heart_rate,
                                 int8_t hr_valid)
 {
-    memset(sample, 0, sizeof(*sample));
-
     if ((spo2_valid == 1) && (spo2 > 0) && (spo2 <= 100))
     {
-        sample->spo2_percent = (uint8_t)spo2;
-    }
+        uint16_t display_spo2 = (uint16_t)spo2;
 
-    if ((hr_valid == 1) && (heart_rate > 0) && (heart_rate <= TASK_SPO2_HR_MAX_BPM))
+        if (Task_Spo2IsDisplayValueAllowed(display_spo2,
+                                           s_spo2_display_state.spo2_percent,
+                                           s_spo2_has_display_spo2,
+                                           &s_spo2_candidate) != 0U)
+        {
+            s_spo2_display_state.spo2_percent = (uint8_t)display_spo2;
+            s_spo2_has_display_spo2 = 1U;
+        }
+    }
+    else
     {
-        sample->heart_rate_bpm = (uint16_t)heart_rate;
+        s_spo2_candidate.count = 0U;
     }
 
-    sample->perfusion_permille = Task_Spo2EstimatePerfusion();
+    if ((hr_valid == 1) && (heart_rate > 0) && (heart_rate <= 65535))
+    {
+        uint16_t display_hr = (uint16_t)heart_rate;
+
+        if (Task_Spo2IsDisplayValueAllowed(display_hr,
+                                           s_spo2_display_state.heart_rate_bpm,
+                                           s_spo2_has_display_hr,
+                                           &s_hr_candidate) != 0U)
+        {
+            s_spo2_display_state.heart_rate_bpm = display_hr;
+            s_spo2_has_display_hr = 1U;
+        }
+    }
+    else
+    {
+        s_hr_candidate.count = 0U;
+    }
+
+    s_spo2_display_state.perfusion_permille = Task_Spo2EstimatePerfusion();
+    *sample = s_spo2_display_state;
 }
 
 /*

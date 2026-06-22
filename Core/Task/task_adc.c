@@ -15,6 +15,7 @@
  */
 
 #include "task_adc.h"
+#include "app_buzzer.h"
 #include "task_debug.h"
 #include "task_lora.h"
 
@@ -35,6 +36,28 @@ static uint16_t s_adcDmaBuffer[APP_ADC_CHANNEL_COUNT] __attribute__((section(".d
 static volatile uint32_t s_adcDmaErrorCount = 0U;
 
 #define ADC_GAS_PPM_MAX 99999.0f
+
+static uint8_t Task_AdcIsGasAlarmActive(const AdcState_t *adc)
+{
+    if (adc == NULL)
+    {
+        return 0U;
+    }
+
+    if ((APP_ADC_CHANNEL_COUNT > 0U) &&
+        (adc->gas_concentration[0] >= APP_GAS_NGAS_ALARM_THRESHOLD_PPM))
+    {
+        return 1U;
+    }
+
+    if ((APP_ADC_CHANNEL_COUNT > 1U) &&
+        (adc->gas_concentration[1] >= APP_GAS_LPG_ALARM_THRESHOLD_PPM))
+    {
+        return 1U;
+    }
+
+    return 0U;
+}
 
 float compute_gas_concentration(float A, float B, uint16_t V0, uint16_t VAO)
 {
@@ -148,6 +171,7 @@ void Task_AdcEntry(void *argument)
                 adc.update_count++;
                 adc.error_count = s_adcDmaErrorCount;
                 App_StateSetAdc(&adc);      /* 更新全局 ADC 状态 */
+                App_BuzzerSetGasAlarm(Task_AdcIsGasAlarmActive(&adc));
                 (void)osEventFlagsSet(g_sysEventFlags, SYS_EVT_ADC_UPDATED);
                 HAL_ADC_Stop_DMA(&APP_ADC_HANDLE);
             }

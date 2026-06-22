@@ -1,6 +1,7 @@
 #include "app_rtos.h"
 
 #include "app_config.h"
+#include "app_buzzer.h"
 #include "app_event.h"
 #include "app_msg.h"
 #include "app_state.h"
@@ -110,6 +111,11 @@ void App_RtosCreateObjects(void)
         App_Error(0x1002U);
     }
 
+    if (App_BuzzerInit() != 0)
+    {
+        App_Error(0x1004U);
+    }
+
     g_initTaskHandle = osThreadNew(InitTask, NULL, &initTaskAttr);
     if (g_initTaskHandle == NULL)
     {
@@ -135,6 +141,11 @@ static void InitTask(void *argument)
     if (App_StartRuntimeTasks() != 0)                //任务建立
     {
         App_Error(0x1200U);
+    }
+
+    if (App_BuzzerStart() != 0)
+    {
+        App_Error(0x1201U);
     }
 
     osEventFlagsSet(g_sysEventFlags, SYS_EVT_INIT_DONE);
