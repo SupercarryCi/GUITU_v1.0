@@ -118,14 +118,19 @@ void Task_AdcEntry(void *argument)
 {
     AdcState_t adc;
     uint32_t next_tick;
+    uint8_t gas_alarm_lora_sent;
 
     (void)argument;                         /* 显式标记未使用参数, 消除编译器警告 */
     memset(&adc, 0, sizeof(adc));
+    gas_alarm_lora_sent = 0U;
 
     osEventFlagsWait(g_sysEventFlags,
                      SYS_EVT_INIT_DONE,
                      osFlagsWaitAny | osFlagsNoClear,
                      osWaitForever);
+
+    /* 等待气体传感器上电稳定，期间不启动 ADC DMA。 */
+    osDelay(APP_ADC_STARTUP_DELAY_MS);
     next_tick = osKernelGetTickCount();
 
     for (;;)
@@ -141,6 +146,7 @@ void Task_AdcEntry(void *argument)
             if (osSemaphoreAcquire(g_adcReadySem, APP_ADC_SAMPLE_TIMEOUT_MS) == osOK)
             {
                 uint32_t i;
+                uint8_t gas_alarm_active;
 
                 for (i = 0U; i < APP_ADC_CHANNEL_COUNT; i++)
                 {
@@ -168,10 +174,27 @@ void Task_AdcEntry(void *argument)
 //                }
             /* 测试: 每 10 个 ADC 周期通过 LoRa 发送一次气体浓度⬆️ */
 
+                gas_alarm_active = Task_AdcIsGasAlarmActive(&adc);
                 adc.update_count++;
                 adc.error_count = s_adcDmaErrorCount;
                 App_StateSetAdc(&adc);      /* 更新全局 ADC 状态 */
-                App_BuzzerSetGasAlarm(Task_AdcIsGasAlarmActive(&adc));
+                App_BuzzerSetGasAlarm(gas_alarm_active);
+
+                if ((gas_alarm_active != 0U) && (gas_alarm_lora_sent == 0U))
+                {
+                    const uint8_t alarm_payload = (uint8_t)'4';
+
+                    /* 队列满时保留未发送状态，后续采样继续尝试直到成功入队。 */
+                    if (Lora_SendBytes(&alarm_payload, 1U) == 0)
+                    {
+                        gas_alarm_lora_sent = 1U;
+                    }
+                }
+                else if (gas_alarm_active == 0U)
+                {
+                    gas_alarm_lora_sent = 0U;
+                }
+
                 (void)osEventFlagsSet(g_sysEventFlags, SYS_EVT_ADC_UPDATED);
                 HAL_ADC_Stop_DMA(&APP_ADC_HANDLE);
             }

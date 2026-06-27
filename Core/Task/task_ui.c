@@ -76,7 +76,10 @@
 #define UI_GAS_BAR_MAX_PPM    50000U //气体浓度条最大值
 #define UI_PI                 3.14159265358979323846f
 #define UI_RAD_TO_DEG          (180.0f / UI_PI)
-#define UI_INS_SWITCH_ATTITUDE_DEG 30.0f
+#define UI_HAND_RAISED_ROLL_TARGET_DEG 90.0f
+#define UI_HAND_RAISED_ROLL_TOL_DEG    30.0f
+#define UI_HAND_RAISED_PITCH_MAX_DEG   30.0f
+#define UI_RETURN_ENABLE_HAND_RAISED_FLIP 1U    /* 仅抬手时反向显示返航箭头。 */
 #define UI_STATUS_ICON_SIZE   48U
 #define UI_STATUS_VALUE_X_OFF 70U    //状态栏数值x偏移
 #define UI_STATUS_VALUE_Y_OFF 36U    //状态栏数值y偏移
@@ -102,6 +105,7 @@
 #define UI_RETURN_TEXT_W      210U
 #define UI_RETURN_TEXT_H      48U
 #define UI_RETURN_FRAME_NONE  0xFFU
+#define UI_RETURN_TURN_UNSET  2
 
 /* 临时 UI 卡顿定位开关，定位完成后可改为 0U。 */
 #ifndef UI_DIAG_ENABLE
@@ -143,6 +147,12 @@
 #define UI_MAIN_CARD_VALUE_Y       30U
 #define UI_MAIN_CARD_VALUE_W       110U
 #define UI_MAIN_CARD_VALUE_H       30U
+#define UI_MAIN_DIGIT_WIDTH        15U
+#define UI_MAIN_DIGIT_HEIGHT       21U
+#define UI_MAIN_DIGIT_ADVANCE      18U
+#define UI_MAIN_DIGIT_DASH_INDEX   10U
+#define UI_MAIN_DIGIT_M_INDEX      11U
+#define UI_MAIN_DIGIT_GLYPH_COUNT  12U
 #define UI_MAIN_CARD0_VALUE_BG     0x0860U
 #define UI_MAIN_CARD1_VALUE_BG     0x0041U
 #define UI_MAIN_CARD2_VALUE_BG     0x0021U
@@ -250,8 +260,10 @@ static UiView_t s_view = UI_VIEW_MAIN;//视图状态量
 static UiView_t s_lastRenderedView = (UiView_t)0xFFU;//上次渲染的视图状态量，初始值设置为无效值以确保首次渲染
 static uint8_t s_mainValueValid = 0U;
 static uint32_t s_lastStatusValue[4];
+static uint8_t s_lastStatusDataValid[4];
 static uint8_t s_lastReturnFrame = UI_RETURN_FRAME_NONE;
 static uint32_t s_lastReturnDistanceM = 0xFFFFFFFFU;
+static int8_t s_lastReturnTurn = UI_RETURN_TURN_UNSET;
 static uint16_t s_returnIconBuffer[COMPASS_ICON_BBOX_MAX_W * COMPASS_ICON_BBOX_MAX_H];
 static uint16_t s_dashboardDecodeBuffer[UI_DASHBOARD_CHUNK_PIXELS];
 static uint8_t s_mainBackgroundValid = 0U;
@@ -494,23 +506,25 @@ static float Ui_CdegToRad(int16_t cdeg)
 {
     return ((float)cdeg * UI_PI) / 18000.0f;
 }
+#if (UI_RETURN_ENABLE_HAND_RAISED_FLIP != 0U)
 static uint8_t Ui_IsHandRaisedForIns(const AppSnapshot_t *snapshot)
 {
-    float roll_deg;
-    float pitch_deg;
+    float roll_abs_deg;
+    float pitch_abs_deg;
 
     if ((snapshot == NULL) || (snapshot->nav.update_count == 0U))
     {
         return 0U;
     }
 
-    roll_deg = fabsf(snapshot->nav.data.attitude_rad[0] * UI_RAD_TO_DEG);
-    pitch_deg = fabsf(snapshot->nav.data.attitude_rad[1] * UI_RAD_TO_DEG);
+    roll_abs_deg = fabsf(snapshot->nav.data.attitude_rad[0] * UI_RAD_TO_DEG);
+    pitch_abs_deg = fabsf(snapshot->nav.data.attitude_rad[1] * UI_RAD_TO_DEG);
 
-    /* 复用 INS/PDR 切换条件：roll/pitch 都小于30度时视为抬手。 */
-    return ((roll_deg < UI_INS_SWITCH_ATTITUDE_DEG) &&
-            (pitch_deg < UI_INS_SWITCH_ATTITUDE_DEG)) ? 1U : 0U;
+    /* 实测抬手稳定段 Roll 接近 +/-90 度，Pitch 仍接近 0 度。 */
+    return ((fabsf(roll_abs_deg - UI_HAND_RAISED_ROLL_TARGET_DEG) <= UI_HAND_RAISED_ROLL_TOL_DEG) &&
+            (pitch_abs_deg <= UI_HAND_RAISED_PITCH_MAX_DEG)) ? 1U : 0U;
 }
+#endif
 
 static uint32_t Ui_DistanceMmToMeter(int32_t distance_mm)
 {
@@ -609,12 +623,15 @@ __weak int32_t App_UiGetReturnGuidance(const AppSnapshot_t *snapshot, UiReturnGu
     {
         guidance->valid = 1U;
         guidance->heading_rad = Ui_CdegToRad(guide->relative_bearing_cdeg);
+#if (UI_RETURN_ENABLE_HAND_RAISED_FLIP != 0U)
         if (Ui_IsHandRaisedForIns(snapshot) != 0U)
         {
             /* 抬手时设备+x变为行人正方向，返航UI箭头需要反向显示。 */
             guidance->heading_rad += UI_PI;
         }
+#endif
         guidance->distance_m = Ui_DistanceMmToMeter(guide->distance_to_next_mm);
+        guidance->turn_after_next = guide->turn_after_next;
         return 0;
     }
 
@@ -796,6 +813,121 @@ static void Ui_DrawTextScaled(uint16_t x,
     }
 }
 
+/* 主数值专用 15x21 字模，常量保存在 Flash。 */
+static const uint16_t s_uiMainDigit15x21[UI_MAIN_DIGIT_GLYPH_COUNT][UI_MAIN_DIGIT_HEIGHT] =
+{
+    {0x0F80U, 0x0F80U, 0x1FE0U, 0x3FF0U, 0x3870U, 0x3870U, 0x7038U, 0x7038U, 0x7038U, 0x7038U, 0x7038U, 0x7038U, 0x7038U, 0x7038U, 0x7038U, 0x7038U, 0x7870U, 0x3870U, 0x3FF0U, 0x1FE0U, 0x07C0U},
+    {0x0380U, 0x0380U, 0x0380U, 0x0780U, 0x0F80U, 0x1F80U, 0x3F80U, 0x3B80U, 0x3B80U, 0x2380U, 0x0380U, 0x0380U, 0x0380U, 0x0380U, 0x0380U, 0x0380U, 0x0380U, 0x0380U, 0x0380U, 0x0380U, 0x0380U},
+    {0x0FC0U, 0x0FC0U, 0x1FF0U, 0x3FF0U, 0x7878U, 0x7038U, 0x7038U, 0x0038U, 0x0038U, 0x0078U, 0x00F0U, 0x01E0U, 0x03C0U, 0x0780U, 0x0F00U, 0x0F00U, 0x1E00U, 0x3C00U, 0x3FF8U, 0x7FF8U, 0x7FF8U},
+    {0x0F80U, 0x0F80U, 0x3FE0U, 0x3FE0U, 0x78F0U, 0x7070U, 0x0070U, 0x00F0U, 0x00F0U, 0x07E0U, 0x07C0U, 0x07F0U, 0x0078U, 0x0038U, 0x7038U, 0x7038U, 0x7038U, 0x3878U, 0x3FF0U, 0x1FE0U, 0x0FC0U},
+    {0x00E0U, 0x00E0U, 0x01E0U, 0x03E0U, 0x03E0U, 0x07E0U, 0x0EE0U, 0x1CE0U, 0x1CE0U, 0x1CE0U, 0x38E0U, 0x70E0U, 0x60E0U, 0x7FF8U, 0x7FF8U, 0x7FF8U, 0x7FF8U, 0x00E0U, 0x00E0U, 0x00E0U, 0x00E0U},
+    {0x1FF0U, 0x1FF0U, 0x1FF0U, 0x3FF0U, 0x3800U, 0x3800U, 0x3FC0U, 0x3FE0U, 0x3FE0U, 0x7FF0U, 0x7870U, 0x0038U, 0x0038U, 0x0038U, 0x7038U, 0x7038U, 0x7038U, 0x3870U, 0x3FF0U, 0x1FE0U, 0x0F80U},
+    {0x07C0U, 0x07C0U, 0x0FF0U, 0x1FF0U, 0x3C78U, 0x3838U, 0x7000U, 0x7000U, 0x7000U, 0x77C0U, 0x7FE0U, 0x7FF0U, 0x7878U, 0x7038U, 0x7038U, 0x7038U, 0x3038U, 0x3878U, 0x3FF0U, 0x1FE0U, 0x07C0U},
+    {0x7FF8U, 0x7FF8U, 0x7FF8U, 0x7FF8U, 0x0078U, 0x00F0U, 0x01E0U, 0x01C0U, 0x01C0U, 0x03C0U, 0x0380U, 0x0380U, 0x0700U, 0x0700U, 0x0700U, 0x0700U, 0x0700U, 0x0E00U, 0x0E00U, 0x0E00U, 0x0E00U},
+    {0x0FC0U, 0x0FC0U, 0x3FF0U, 0x3FF0U, 0x7878U, 0x7038U, 0x7038U, 0x7878U, 0x7878U, 0x3FF0U, 0x1FE0U, 0x3FF0U, 0x7878U, 0x7038U, 0x7038U, 0x7038U, 0x7038U, 0x7878U, 0x3FF0U, 0x1FE0U, 0x0FC0U},
+    {0x0F80U, 0x0F80U, 0x1FE0U, 0x3FF0U, 0x7870U, 0x7030U, 0x7038U, 0x7038U, 0x7038U, 0x7878U, 0x3FF8U, 0x1FF8U, 0x0FB8U, 0x0038U, 0x0038U, 0x0038U, 0x7070U, 0x78F0U, 0x3FE0U, 0x3FC0U, 0x0F80U},
+    {0x0000U, 0x0000U, 0x0000U, 0x0000U, 0x0000U, 0x0000U, 0x0000U, 0x0000U, 0x0000U, 0x3FF8U, 0x3FF8U, 0x3FF8U, 0x0000U, 0x0000U, 0x0000U, 0x0000U, 0x0000U, 0x0000U, 0x0000U, 0x0000U, 0x0000U},
+    {0x6038U, 0x6038U, 0x7078U, 0x7078U, 0x78F8U, 0x78F8U, 0x7DF8U, 0x7DF8U, 0x6FB8U, 0x6FB8U, 0x6778U, 0x6778U, 0x6338U, 0x6338U, 0x6038U, 0x6038U, 0x6038U, 0x6038U, 0x6038U, 0x6038U, 0x6038U}
+};
+
+static int32_t Ui_DrawMainValueDetailedArea(uint16_t x,
+                                            uint16_t y,
+                                            uint16_t width,
+                                            uint16_t height,
+                                            const char *text,
+                                            uint16_t color,
+                                            uint16_t background)
+{
+    size_t char_index;
+    size_t text_length;
+    uint32_t pixel_index;
+    uint16_t row;
+    uint16_t col;
+
+    if (text == NULL)
+    {
+        return -1;
+    }
+
+    text_length = strlen(text);
+    if ((text_length == 0U) ||
+        ((((text_length - 1U) * UI_MAIN_DIGIT_ADVANCE) + UI_MAIN_DIGIT_WIDTH) > width) ||
+        (((uint32_t)width * height) > UI_DASHBOARD_CHUNK_PIXELS) ||
+        (height < UI_MAIN_DIGIT_HEIGHT))
+    {
+        return -1;
+    }
+
+    for (char_index = 0U; char_index < text_length; char_index++)
+    {
+        if (((text[char_index] < '0') || (text[char_index] > '9')) &&
+            (text[char_index] != '-') &&
+            (text[char_index] != 'M'))
+        {
+            return -1;
+        }
+    }
+
+    for (pixel_index = 0U; pixel_index < ((uint32_t)width * height); pixel_index++)
+    {
+        s_dashboardDecodeBuffer[pixel_index] = background;
+    }
+
+    for (char_index = 0U; char_index < text_length; char_index++)
+    {
+        uint8_t glyph_index;
+        uint16_t x_offset;
+
+        if (text[char_index] == '-')
+        {
+            glyph_index = UI_MAIN_DIGIT_DASH_INDEX;
+        }
+        else if (text[char_index] == 'M')
+        {
+            glyph_index = UI_MAIN_DIGIT_M_INDEX;
+        }
+        else
+        {
+            glyph_index = (uint8_t)(text[char_index] - '0');
+        }
+        x_offset = (uint16_t)(char_index * UI_MAIN_DIGIT_ADVANCE);
+
+        for (row = 0U; row < UI_MAIN_DIGIT_HEIGHT; row++)
+        {
+            uint16_t bits = s_uiMainDigit15x21[glyph_index][row];
+            for (col = 0U; col < UI_MAIN_DIGIT_WIDTH; col++)
+            {
+                if ((bits & (uint16_t)(1U << (14U - col))) != 0U)
+                {
+                    s_dashboardDecodeBuffer[((uint32_t)row * width) + x_offset + col] = color;
+                }
+            }
+        }
+    }
+
+    return ILI9488_DrawRGB565Image(&g_lcd,
+                                    x,
+                                    y,
+                                    width,
+                                    height,
+                                    s_dashboardDecodeBuffer);
+}
+
+static int32_t Ui_DrawMainValueDetailed(uint16_t x,
+                                        uint16_t y,
+                                        const char *text,
+                                        uint16_t color,
+                                        uint16_t background)
+{
+    return Ui_DrawMainValueDetailedArea(x,
+                                        y,
+                                        UI_MAIN_CARD_VALUE_W,
+                                        UI_MAIN_CARD_VALUE_H,
+                                        text,
+                                        color,
+                                        background);
+}
+
 typedef enum
 {
     UI_HZ_KUAI = 0,
@@ -825,6 +957,12 @@ typedef enum
     UI_HZ_KUANG,
     UI_HZ_SHANG,
     UI_HZ_BAO_REPORT,
+    UI_HZ_QIAN,
+    UI_HZ_JIN,
+    UI_HZ_HOU,
+    UI_HZ_ZUO,
+    UI_HZ_YOU,
+    UI_HZ_ZHUAN,
     UI_HZ_COUNT
 } UiHzGlyphId_t;
 
@@ -867,7 +1005,19 @@ static const uint16_t s_uiHzGlyph[UI_HZ_COUNT][16] =
     /* 上 */
     {0x0080U, 0x0080U, 0x0080U, 0x0080U, 0x00FEU, 0x0080U, 0x0080U, 0x0080U, 0x0080U, 0x0080U, 0x0080U, 0x0080U, 0x3FFFU, 0x0000U, 0x0000U, 0x0000U},
     /* 报 */
-    {0x0441U, 0x0441U, 0x3F45U, 0x0442U, 0x0440U, 0x057FU, 0x0651U, 0x0C51U, 0x344AU, 0x044AU, 0x0444U, 0x044AU, 0x1451U, 0x0860U, 0x0000U, 0x0000U}
+    {0x0441U, 0x0441U, 0x3F45U, 0x0442U, 0x0440U, 0x057FU, 0x0651U, 0x0C51U, 0x344AU, 0x044AU, 0x0444U, 0x044AU, 0x1451U, 0x0860U, 0x0000U, 0x0000U},
+    /* 前 */
+    {0x0000U, 0x0000U, 0x0820U, 0x04C0U, 0xFFFCU, 0x0000U, 0x7E08U, 0x4248U, 0x4248U, 0x7E48U, 0x4248U, 0x7E48U, 0x4208U, 0x4208U, 0x4E78U, 0x0000U},
+    /* 进 */
+    {0x0000U, 0x0000U, 0x4110U, 0x2110U, 0x3110U, 0x17FCU, 0x0110U, 0xE110U, 0x2110U, 0x2FFEU, 0x2110U, 0x2310U, 0x2610U, 0xD000U, 0x8FFEU, 0x0000U},
+    /* 后 */
+    {0x0000U, 0x0000U, 0x007CU, 0x3FC0U, 0x2000U, 0x2000U, 0x3FFEU, 0x2000U, 0x2000U, 0x2FF8U, 0x2808U, 0x2808U, 0x4808U, 0x4FF8U, 0x8808U, 0x0000U},
+    /* 左 */
+    {0x0000U, 0x0000U, 0x0200U, 0x0400U, 0x3FFEU, 0x0400U, 0x0400U, 0x0800U, 0x0FFCU, 0x0880U, 0x1080U, 0x1080U, 0x2080U, 0x6080U, 0x5FFEU, 0x0000U},
+    /* 右 */
+    {0x0000U, 0x0000U, 0x0100U, 0x0200U, 0xFFFCU, 0x0400U, 0x0800U, 0x1000U, 0x1FF8U, 0x3008U, 0x5008U, 0x9008U, 0x1008U, 0x1FF8U, 0x1008U, 0x0000U},
+    /* 转 */
+    {0x0000U, 0x0000U, 0x0820U, 0x1020U, 0x7EFCU, 0x2040U, 0x2840U, 0x49FEU, 0x7E80U, 0x0880U, 0x08FCU, 0x0F0CU, 0x78D0U, 0x0870U, 0x0818U, 0x0000U}
 };
 
 static void Ui_DrawHzGlyph(uint16_t x, uint16_t y, uint8_t glyph_id, uint8_t scale, uint16_t color)
@@ -1109,7 +1259,16 @@ static void Ui_UpdateMainBaseInfo(const AppSnapshot_t *snapshot, uint8_t force)
                                UI_MAIN_BASE_DIST_H,
                                UI_MAIN_BASE_INFO_BG);
         (void)snprintf(text, sizeof(text), "%luM", (unsigned long)distance_m);
-        Ui_DrawTextScaled(UI_MAIN_BASE_DIST_X, UI_MAIN_BASE_DIST_Y, text, UI_MAIN_BASE_DIST_X_SCALE, UI_MAIN_BASE_DIST_Y_SCALE, UI_COLOR_TEXT);
+        if (Ui_DrawMainValueDetailedArea(UI_MAIN_BASE_DIST_X,
+                                         UI_MAIN_BASE_DIST_Y,
+                                         UI_MAIN_BASE_DIST_W,
+                                         UI_MAIN_BASE_DIST_H,
+                                         text,
+                                         UI_COLOR_TEXT,
+                                         UI_MAIN_BASE_INFO_BG) != 0)
+        {
+            Ui_DrawTextScaled(UI_MAIN_BASE_DIST_X, UI_MAIN_BASE_DIST_Y, text, UI_MAIN_BASE_DIST_X_SCALE, UI_MAIN_BASE_DIST_Y_SCALE, UI_COLOR_TEXT);
+        }
         s_lastMainBaseDistanceM = distance_m;
     }
 }
@@ -1141,7 +1300,7 @@ static void Ui_DrawMainStaticOverlay(const AppSnapshot_t *snapshot)
                           card->color);
     }
 }
-static void Ui_UpdateMainStatusCard(uint8_t index, uint32_t value, uint8_t force)
+static void Ui_UpdateMainStatusCard(uint8_t index, uint32_t value, uint8_t data_valid, uint8_t force)
 {
     char text[16];
     const UiMainStatusLayout_t *card;
@@ -1150,25 +1309,42 @@ static void Ui_UpdateMainStatusCard(uint8_t index, uint32_t value, uint8_t force
     {
         return;
     }
-    if ((force == 0U) && (s_mainValueValid != 0U) && (s_lastStatusValue[index] == value))
+    if ((force == 0U) &&
+        (s_mainValueValid != 0U) &&
+        (s_lastStatusDataValid[index] == data_valid) &&
+        ((data_valid == 0U) || (s_lastStatusValue[index] == value)))
     {
         return;
     }
 
     card = &s_mainStatusLayout[index];
-    (void)ILI9488_FillRect(&g_lcd,
-                           (uint16_t)(card->x + UI_MAIN_CARD_VALUE_X),
-                           (uint16_t)(card->y + UI_MAIN_CARD_VALUE_Y),
-                           UI_MAIN_CARD_VALUE_W,
-                           UI_MAIN_CARD_VALUE_H,
-                           card->value_bg);
-    (void)snprintf(text, sizeof(text), "%lu", (unsigned long)value);
-    Ui_DrawTextScaled((uint16_t)(card->x + UI_MAIN_CARD_VALUE_X),
-                      (uint16_t)(card->y + UI_MAIN_CARD_VALUE_Y),
-                      text,
-                      UI_MAIN_CARD_VALUE_X_SCALE,
-                      UI_MAIN_CARD_VALUE_Y_SCALE,
-                      card->color);
+    if (data_valid != 0U)
+    {
+        (void)snprintf(text, sizeof(text), "%lu", (unsigned long)value);
+    }
+    else
+    {
+        (void)snprintf(text, sizeof(text), "---");
+    }
+    if (Ui_DrawMainValueDetailed((uint16_t)(card->x + UI_MAIN_CARD_VALUE_X),
+                                 (uint16_t)(card->y + UI_MAIN_CARD_VALUE_Y),
+                                 text,
+                                 card->color,
+                                 card->value_bg) != 0)
+    {
+        (void)ILI9488_FillRect(&g_lcd,
+                               (uint16_t)(card->x + UI_MAIN_CARD_VALUE_X),
+                               (uint16_t)(card->y + UI_MAIN_CARD_VALUE_Y),
+                               UI_MAIN_CARD_VALUE_W,
+                               UI_MAIN_CARD_VALUE_H,
+                               card->value_bg);
+        Ui_DrawTextScaled((uint16_t)(card->x + UI_MAIN_CARD_VALUE_X),
+                          (uint16_t)(card->y + UI_MAIN_CARD_VALUE_Y),
+                          text,
+                          UI_MAIN_CARD_VALUE_X_SCALE,
+                          UI_MAIN_CARD_VALUE_Y_SCALE,
+                          card->color);
+    }
     /* Redraw unit because the value refresh area overlaps it. */
     Ui_DrawTextScaled((uint16_t)(card->x + UI_MAIN_CARD_UNIT_X),
                       (uint16_t)(card->y + UI_MAIN_CARD_UNIT_Y),
@@ -1177,16 +1353,19 @@ static void Ui_UpdateMainStatusCard(uint8_t index, uint32_t value, uint8_t force
                       UI_MAIN_CARD_UNIT_Y_SCALE,
                       card->color);
     s_lastStatusValue[index] = value;
+    s_lastStatusDataValid[index] = data_valid;
 }
 static void Ui_DrawMainView(const AppSnapshot_t *snapshot, uint8_t full_redraw)
 {
     uint8_t force_update;
+    uint8_t adc_data_valid;
     uint32_t value[4];
 
     value[0] = Ui_FloatToU32(snapshot->adc.gas_concentration[0]);
     value[1] = Ui_FloatToU32(snapshot->adc.gas_concentration[1]);
     value[2] = snapshot->spo2.heart_rate_bpm;
     value[3] = snapshot->spo2.spo2_percent;
+    adc_data_valid = (snapshot->adc.update_count != 0U) ? 1U : 0U;
     force_update = ((full_redraw != 0U) || (s_mainValueValid == 0U)) ? 1U : 0U;
 
     if (full_redraw != 0U)
@@ -1204,10 +1383,10 @@ static void Ui_DrawMainView(const AppSnapshot_t *snapshot, uint8_t full_redraw)
 
     Ui_UpdateTopSignal(snapshot, force_update);
     Ui_UpdateMainBaseInfo(snapshot, force_update);
-    Ui_UpdateMainStatusCard(0U, value[0], force_update);
-    Ui_UpdateMainStatusCard(1U, value[1], force_update);
-    Ui_UpdateMainStatusCard(2U, value[2], force_update);
-    Ui_UpdateMainStatusCard(3U, value[3], force_update);
+    Ui_UpdateMainStatusCard(0U, value[0], adc_data_valid, force_update);
+    Ui_UpdateMainStatusCard(1U, value[1], adc_data_valid, force_update);
+    Ui_UpdateMainStatusCard(2U, value[2], snapshot->spo2.heart_rate_valid, force_update);
+    Ui_UpdateMainStatusCard(3U, value[3], snapshot->spo2.spo2_valid, force_update);
     s_mainValueValid = 1U;
 }
 static void Ui_DrawQuickButton(uint16_t y, const uint8_t *text, uint8_t count)
@@ -1498,9 +1677,75 @@ static void Ui_LoraPopupClose(void)
     s_lastRenderedView = (UiView_t)0xFFU;
 }
 
+static void Ui_DrawReturnInstruction(uint32_t distance_m, int8_t turn_after_next)
+{
+    static const uint8_t forward_text[] = {UI_HZ_QIAN, UI_HZ_JIN};
+    static const uint8_t left_text[] = {UI_HZ_HOU, UI_HZ_ZUO, UI_HZ_ZHUAN};
+    static const uint8_t right_text[] = {UI_HZ_HOU, UI_HZ_YOU, UI_HZ_ZHUAN};
+    const uint8_t *turn_text = NULL;
+    char distance_text[16];
+    size_t distance_length;
+    uint16_t forward_width;
+    uint16_t turn_width;
+    uint16_t distance_width;
+    uint16_t total_width;
+    uint16_t cursor_x;
+    uint8_t ascii_scale = 2U;
+
+    (void)snprintf(distance_text, sizeof(distance_text), "%luM", (unsigned long)distance_m);
+    distance_length = strlen(distance_text);
+    forward_width = Ui_HzTextWidth((uint8_t)sizeof(forward_text), 1U);
+    turn_width = 0U;
+    /* 实测返航提示左右相反，这里只取反显示，不改算法输出。 */
+    if (turn_after_next < 0)
+    {
+        turn_text = right_text;
+    }
+    else if (turn_after_next > 0)
+    {
+        turn_text = left_text;
+    }
+    if (turn_text != NULL)
+    {
+        turn_width = Ui_HzTextWidth((uint8_t)sizeof(left_text), 1U);
+    }
+
+    distance_width = (uint16_t)(distance_length * 6U * ascii_scale);
+    total_width = (uint16_t)(forward_width + UI_QUICK_HZ_SPACING + distance_width);
+    if (turn_width != 0U)
+    {
+        total_width = (uint16_t)(total_width + UI_QUICK_HZ_SPACING + turn_width);
+    }
+    if (total_width > UI_RETURN_TEXT_W)
+    {
+        ascii_scale = 1U;
+        distance_width = (uint16_t)(distance_length * 6U);
+        total_width = (uint16_t)(forward_width + UI_QUICK_HZ_SPACING + distance_width);
+        if (turn_width != 0U)
+        {
+            total_width = (uint16_t)(total_width + UI_QUICK_HZ_SPACING + turn_width);
+        }
+    }
+
+    cursor_x = (total_width >= UI_RETURN_TEXT_W) ? UI_RETURN_TEXT_X
+                                                  : (uint16_t)(UI_RETURN_TEXT_X + ((UI_RETURN_TEXT_W - total_width) / 2U));
+    Ui_DrawHzText(cursor_x, UI_RETURN_TEXT_Y, forward_text, (uint8_t)sizeof(forward_text), 1U, ILI9488_COLOR_WHITE);
+    cursor_x = (uint16_t)(cursor_x + forward_width + UI_QUICK_HZ_SPACING);
+    Ui_DrawText(cursor_x,
+                (uint16_t)(UI_RETURN_TEXT_Y + 1U),
+                distance_text,
+                ascii_scale,
+                ILI9488_COLOR_WHITE);
+
+    if (turn_text != NULL)
+    {
+        cursor_x = (uint16_t)(cursor_x + distance_width + UI_QUICK_HZ_SPACING);
+        Ui_DrawHzText(cursor_x, UI_RETURN_TEXT_Y, turn_text, (uint8_t)sizeof(left_text), 1U, ILI9488_COLOR_WHITE);
+    }
+}
 static void Ui_DrawReturnView(const AppSnapshot_t *snapshot, uint8_t full_redraw)
 {
-    char text[24];
+
     UiReturnGuidance_t guidance;
     uint8_t frame;
 
@@ -1534,18 +1779,20 @@ static void Ui_DrawReturnView(const AppSnapshot_t *snapshot, uint8_t full_redraw
         s_lastReturnFrame = frame;
     }
 
-    if ((full_redraw != 0U) || (guidance.distance_m != s_lastReturnDistanceM))
+    if ((full_redraw != 0U) ||
+        (guidance.distance_m != s_lastReturnDistanceM) ||
+        (guidance.turn_after_next != s_lastReturnTurn))
     {
         (void)ILI9488_FillRect(&g_lcd,
-                               150U,
-                               222U,
+                               UI_RETURN_TEXT_X,
+                               UI_RETURN_TEXT_Y,
                                UI_RETURN_TEXT_W,
                                UI_RETURN_TEXT_H,
                                ILI9488_COLOR_BLACK);
         Ui_LcdGapDelay();
-        (void)snprintf(text, sizeof(text), "%luM", (unsigned long)guidance.distance_m);
-        Ui_DrawText(UI_RETURN_TEXT_X, UI_RETURN_TEXT_Y, text, 3U, ILI9488_COLOR_WHITE);
+        Ui_DrawReturnInstruction(guidance.distance_m, guidance.turn_after_next);
         s_lastReturnDistanceM = guidance.distance_m;
+        s_lastReturnTurn = guidance.turn_after_next;
     }
 
     if (full_redraw != 0U)
@@ -1663,6 +1910,7 @@ void App_UiRender(const AppSnapshot_t *snapshot)
         {
             s_lastReturnFrame = UI_RETURN_FRAME_NONE;
             s_lastReturnDistanceM = 0xFFFFFFFFU;
+            s_lastReturnTurn = UI_RETURN_TURN_UNSET;
         }
         Ui_DiagLog("U F+ v%u", (unsigned int)s_view);
         if (s_view != UI_VIEW_MAIN)
@@ -1747,7 +1995,8 @@ void Task_UiEntry(void *argument)
 {
     UiState_t ui;
     AppSnapshot_t snapshot;
-    uint32_t next_tick;
+    uint32_t next_touch_tick;
+    uint32_t next_display_tick;
     uint32_t loop_count;
     uint32_t loop_start_tick;
     uint32_t phase_tick;
@@ -1756,6 +2005,7 @@ void Task_UiEntry(void *argument)
     uint32_t display_ms;
     uint32_t touch_wait_ms;
     uint32_t touch_ms;
+    uint32_t now;
 
     (void)argument;
     memset(&ui, 0, sizeof(ui));
@@ -1765,7 +2015,9 @@ void Task_UiEntry(void *argument)
                      SYS_EVT_INIT_DONE,
                      osFlagsWaitAny | osFlagsNoClear,
                      osWaitForever);
-    next_tick = osKernelGetTickCount();
+    now = osKernelGetTickCount();
+    next_touch_tick = now;
+    next_display_tick = now;
 
     for (;;)
     {
@@ -1773,32 +2025,13 @@ void Task_UiEntry(void *argument)
 
         loop_count++;
         loop_start_tick = osKernelGetTickCount();
+        snapshot_ms = 0xFFFFFFFFU;
         display_wait_ms = 0xFFFFFFFFU;
         display_ms = 0xFFFFFFFFU;
         touch_wait_ms = 0xFFFFFFFFU;
         touch_ms = 0xFFFFFFFFU;
 
-        memset(&snapshot, 0, sizeof(snapshot));
-        Ui_DiagLog("U%lu S+", (unsigned long)loop_count);
-        phase_tick = osKernelGetTickCount();
-        App_StateGetSnapshot(&snapshot);
-        snapshot_ms = osKernelGetTickCount() - phase_tick;
-        Ui_DiagLog("U%lu S-%lu", (unsigned long)loop_count, (unsigned long)snapshot_ms);
-
-        Ui_DiagLog("U%lu D+", (unsigned long)loop_count);
-        phase_tick = osKernelGetTickCount();
-        if (osMutexAcquire(g_spiDisplayMutex, osWaitForever) == osOK)
-        {
-            display_wait_ms = osKernelGetTickCount() - phase_tick;
-            Ui_DiagLog("U%lu R+%lu", (unsigned long)loop_count, (unsigned long)display_wait_ms);
-            phase_tick = osKernelGetTickCount();
-            App_UiRender(&snapshot);
-            display_ms = osKernelGetTickCount() - phase_tick;
-            Ui_DiagLog("U%lu R-%lu", (unsigned long)loop_count, (unsigned long)display_ms);
-            osMutexRelease(g_spiDisplayMutex);
-            ui.render_count++;
-        }
-
+        /* 触摸先于显示处理，避免输入额外等待一个显示周期。 */
         memset(&command, 0, sizeof(command));
         Ui_DiagLog("U%lu T+", (unsigned long)loop_count);
         phase_tick = osKernelGetTickCount();
@@ -1821,6 +2054,39 @@ void Task_UiEntry(void *argument)
         }
         Ui_DiagLog("U%lu T-%lu", (unsigned long)loop_count, (unsigned long)touch_ms);
 
+        now = osKernelGetTickCount();
+        if ((int32_t)(now - next_display_tick) >= 0)
+        {
+            memset(&snapshot, 0, sizeof(snapshot));
+            Ui_DiagLog("U%lu S+", (unsigned long)loop_count);
+            phase_tick = osKernelGetTickCount();
+            App_StateGetSnapshot(&snapshot);
+            snapshot_ms = osKernelGetTickCount() - phase_tick;
+            Ui_DiagLog("U%lu S-%lu", (unsigned long)loop_count, (unsigned long)snapshot_ms);
+
+            Ui_DiagLog("U%lu D+", (unsigned long)loop_count);
+            phase_tick = osKernelGetTickCount();
+            if (osMutexAcquire(g_spiDisplayMutex, osWaitForever) == osOK)
+            {
+                display_wait_ms = osKernelGetTickCount() - phase_tick;
+                Ui_DiagLog("U%lu R+%lu", (unsigned long)loop_count, (unsigned long)display_wait_ms);
+                phase_tick = osKernelGetTickCount();
+                App_UiRender(&snapshot);
+                display_ms = osKernelGetTickCount() - phase_tick;
+                Ui_DiagLog("U%lu R-%lu", (unsigned long)loop_count, (unsigned long)display_ms);
+                osMutexRelease(g_spiDisplayMutex);
+                ui.render_count++;
+            }
+
+            next_display_tick += APP_UI_PERIOD_MS;
+            now = osKernelGetTickCount();
+            if ((int32_t)(now - next_display_tick) >= 0)
+            {
+                /* 显示超时时跳过已错过的周期，避免连续追帧占用任务。 */
+                next_display_tick = now + APP_UI_PERIOD_MS;
+            }
+        }
+
         App_StateSetUi(&ui);
         Ui_DiagLog("U%lu E v%u s%lu dw%lu d%lu tw%lu t%lu a%lu",
                    (unsigned long)loop_count,
@@ -1831,8 +2097,14 @@ void Task_UiEntry(void *argument)
                    (unsigned long)touch_wait_ms,
                    (unsigned long)touch_ms,
                    (unsigned long)(osKernelGetTickCount() - loop_start_tick));
-        next_tick += APP_UI_PERIOD_MS;
-        osDelayUntil(next_tick);
+
+        next_touch_tick += APP_UI_TOUCH_PERIOD_MS;
+        now = osKernelGetTickCount();
+        if ((int32_t)(now - next_touch_tick) >= 0)
+        {
+            /* 显示耗时超过触摸周期时，下一个系统节拍立即恢复轮询。 */
+            next_touch_tick = now + 1U;
+        }
+        osDelayUntil(next_touch_tick);
     }
 }
-

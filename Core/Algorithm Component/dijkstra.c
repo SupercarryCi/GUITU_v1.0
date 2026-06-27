@@ -1233,6 +1233,30 @@ static void nav_fill_return_output(LoraNavContext *ctx, const LoraNavPoint *poin
     out->distance_to_next_mm = nav_meters_to_mm(out->distance_to_next_m);
     out->bearing_to_next_cdeg = nav_deg_to_cdeg(out->bearing_to_next_deg);
     out->relative_bearing_cdeg = nav_deg_to_cdeg(out->relative_bearing_deg);
+
+    if (out->next_route_index + 1u < ctx->route_count)
+    {
+        const LoraNavPoint *segment_start = &ctx->route_points[ctx->snap_segment_index];
+        const LoraNavPoint *following = &ctx->route_points[out->next_route_index + 1u];
+        const float segment_bearing = nav_bearing_deg(segment_start->x_m,
+                                                      segment_start->y_m,
+                                                      target->x_m,
+                                                      target->y_m);
+        const float following_bearing = nav_bearing_deg(target->x_m,
+                                                        target->y_m,
+                                                        following->x_m,
+                                                        following->y_m);
+        const float turn_deg = nav_angle_delta_deg(segment_bearing, following_bearing);
+
+        if (turn_deg > LORA_NAV_EPS)
+        {
+            out->turn_after_next = 1;
+        }
+        else if (turn_deg < -LORA_NAV_EPS)
+        {
+            out->turn_after_next = -1;
+        }
+    }
     out->arrived_home = (out->next_route_index == ctx->route_count - 1u &&
                          out->distance_to_next_m <= ctx->cfg.target_arrive_m);
 }

@@ -12,6 +12,7 @@ extern "C" {
 typedef struct
 {
     uint8_t valid;          /* 0: 使用默认上方方向；1: heading_rad 有效 */
+    int8_t turn_after_next; /* 到达目标点后的转向：-1左，0无，1右 */
     float heading_rad;      /* 纸飞机方向，0 表示屏幕正上方，正值为顺时针 */
     uint32_t distance_m;    /* 距离当前返航目标或基地的距离，单位 m */
 } UiReturnGuidance_t;

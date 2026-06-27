@@ -129,6 +129,7 @@ static void task_control_store_return_guide(uint8_t return_active, const LoraNav
         guide.bearing_to_next_cdeg = out->bearing_to_next_cdeg;
         guide.relative_bearing_cdeg = out->relative_bearing_cdeg;
         guide.next_route_index = out->next_route_index;
+        guide.turn_after_next = out->turn_after_next;
     }
     else
     {

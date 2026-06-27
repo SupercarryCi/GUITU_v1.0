@@ -24,6 +24,9 @@
 #define INS_PDR_HEADING_UPDATE_PERIOD_MS 50U    /* 未判步时也定期刷新行人航向，避免LoRa角度停住。 */
 #define INS_PDR_HEADING_OFFSET_DEG (-18.50f)    /* 手臂佩戴偏差：例如139.00度修正到120.50度 */
 #define INS_PDR_RUN_HEADING_FILTER_ALPHA 0.025f /* 跑步航向圆周EMA系数，200Hz下约200ms平滑。 */
+#define INS_PDR_HAND_RAISED_ROLL_TARGET_DEG 90.0f
+#define INS_PDR_HAND_RAISED_ROLL_TOL_DEG    30.0f
+#define INS_PDR_HAND_RAISED_PITCH_MAX_DEG   30.0f
 
 #define INS_PDR_ENABLE_HEADING_SNAP 0U          /* 临时测试功能：1=四向吸附，0=关闭 */
 #define INS_PDR_HEADING_SNAP_DEG 45.0f          /* 小于该偏差时吸附到0/90/-90/-180度 */
@@ -212,13 +215,20 @@ static void task_ins_pdr_log_heading_diag(const GyroState_t *gyro,
                                           float dcm[3][3],
                                           float current_heading_deg)
 {
-    (void)gyro;
     (void)quat;
     (void)dcm;
+    (void)current_heading_deg;
 
-    /* PH单位为0.01度，来源是当前实际用于PDR/LoRa的行人航向角。 */
-    task_ins_pdr_diag_uart_log("PH:%ld",
-                               (long)task_ins_pdr_float_to_centi(current_heading_deg));
+    if (gyro == NULL)
+    {
+        return;
+    }
+
+    /* EA单位为0.01度，依次为WIT原始Roll/Pitch/Yaw三轴欧拉角。 */
+    task_ins_pdr_diag_uart_log("EA:%ld,%ld,%ld",
+                               (long)task_ins_pdr_float_to_centi(gyro->frame.angle_deg[0]),
+                               (long)task_ins_pdr_float_to_centi(gyro->frame.angle_deg[1]),
+                               (long)task_ins_pdr_float_to_centi(gyro->frame.angle_deg[2]));
 }
 #endif
 #endif
@@ -378,8 +388,8 @@ void Task_Ins_Pdr_Entry(void *argument)
             /*两种导航算法切换逻辑*/
             use_pdr = 1U;
 
-            if ((fabsf(gyro.frame.angle_deg[0]) < 30.0f) &&
-                (fabsf(gyro.frame.angle_deg[1]) < 30.0f))//手臂横过来我就ins，嘎嘎
+            if ((fabsf(fabsf(gyro.frame.angle_deg[0]) - INS_PDR_HAND_RAISED_ROLL_TARGET_DEG) <= INS_PDR_HAND_RAISED_ROLL_TOL_DEG) &&
+                (fabsf(gyro.frame.angle_deg[1]) <= INS_PDR_HAND_RAISED_PITCH_MAX_DEG))//手臂抬起时Roll接近+/-90度，Pitch仍接近0度
             {
                 use_pdr = 0U;
             }

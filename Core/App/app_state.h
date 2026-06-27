@@ -78,7 +78,9 @@ typedef struct
 typedef struct
 {
     uint8_t  spo2_percent;         /* 血氧饱和度 (%) */
+    uint8_t  spo2_valid;           /* 已获得可显示的有效血氧值 */
     uint16_t heart_rate_bpm;       /* 心率 (次/分钟) */
+    uint8_t  heart_rate_valid;     /* 已获得可显示的有效心率值 */
     uint16_t perfusion_permille;   /* 灌注指数 (‰) */
     uint32_t update_count;         /* 累计更新次数 */
     uint32_t error_count;          /* 读取错误次数 */
@@ -124,6 +126,7 @@ typedef struct
     int16_t bearing_to_next_cdeg;  /* 到下一个关键点的绝对方向 */
     int16_t relative_bearing_cdeg; /* 相对当前航向的方向 */
     uint16_t next_route_index;     /* 当前目标路线点索引 */
+    int8_t turn_after_next;        /* 到达目标点后的转向：-1左，0无，1右 */
 } ReturnGuideState_t;
 
 typedef struct

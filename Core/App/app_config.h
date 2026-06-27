@@ -37,12 +37,19 @@ extern "C" {
 
 #define APP_ADC_CHANNEL_COUNT       2U          /* ADC 采集通道数量 */
 #define APP_ADC_SAMPLE_PERIOD_MS    100U        /* ADC 采样周期 (ms) */
+#define APP_ADC_STARTUP_DELAY_MS    10000U      /* 系统初始化完成后等待传感器稳定 */
 #define APP_ADC_SAMPLE_TIMEOUT_MS   20U         /* 单次 ADC 采样超时时间 (ms) */
 #define APP_ADC_VREF_MV             3300U       /* ADC 参考电压 (mV)，用于换算实际电压 */
 #define APP_ADC_FULL_SCALE          65535U      /* ADC 满量程值 (16bit) */
 
-#define APP_UI_PERIOD_MS            500U        /* UI 刷新周期 (2Hz) */
+#define APP_UI_PERIOD_MS            500U        /* UI 显示刷新周期 (2Hz) */
+#define APP_UI_TOUCH_PERIOD_MS      100U        /* 触摸轮询周期 (10Hz) */
 #define APP_SPO2_PERIOD_MS          100U        /* 血氧 FIFO 读取周期 (10Hz)，避免 100Hz 采样溢出 */
+
+/* 佩戴反射光强阈值：0 表示尚未标定，此时只输出串口测试数据，不确认佩戴。 */
+#define APP_SPO2_WEAR_IR_DC_MIN     0U
+#define APP_SPO2_WEAR_RED_DC_MIN    0U
+
 #define APP_LORA_PERIOD_MS          500U        /* LoRa 导航位置发送/收发轮询周期 (2Hz) */
 #define APP_RETURN_PERIOD_MS        100U        /* 返航控制周期 (10Hz) */
 

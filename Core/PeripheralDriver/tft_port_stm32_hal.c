@@ -17,7 +17,7 @@
 #endif
 
 #ifndef TFT_TOUCH_SPI_TIMEOUT_MS
-#define TFT_TOUCH_SPI_TIMEOUT_MS  200U
+#define TFT_TOUCH_SPI_TIMEOUT_MS  50U
 #endif
 
 #ifndef TFT_LCD_CS_GPIO_Port

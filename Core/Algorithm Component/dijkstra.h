@@ -81,6 +81,7 @@ typedef struct
     int16_t bearing_to_next_cdeg;
     int16_t relative_bearing_cdeg;
     uint16_t next_route_index;
+    int8_t turn_after_next; /* -1: left, 0: no following turn, 1: right */
 } LoraNavOutput;
 
 typedef struct
