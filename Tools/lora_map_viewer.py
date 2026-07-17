@@ -1,6 +1,7 @@
 # -*- coding: gbk -*-
 import heapq
 import math
+import os
 import queue
 import re
 import threading
@@ -28,7 +29,7 @@ RETURN_RE = re.compile(r"^\s*R\s*(?:\[.*\])?\s*$", re.IGNORECASE)
 DEFAULT_BAUD = "115200"
 DEFAULT_TURN_ANGLE_DEG = "60"
 DEFAULT_MIN_SEGMENT_M = "0.5"
-DEFAULT_MERGE_DISTANCE_M = "3"
+DEFAULT_MERGE_DISTANCE_M = "5"
 DEFAULT_POINT_LIMIT = "50"
 DEFAULT_PLAY_INTERVAL_MS = "120"
 DEFAULT_SNAP_DISTANCE_M = "3.0"
@@ -36,11 +37,12 @@ DEFAULT_DIRECTION_MATCH_DEG = "45"
 DEFAULT_DIRECTION_BIAS_STRENGTH = "1.0"
 DEFAULT_DIRECTION_BIAS_STEP_M = "1.0"
 DEFAULT_DIRECTION_BIAS_MOVE_THRESHOLD_M = "0.2"
-LARGE_UI_FONT_SIZE = 14
-LARGE_UI_HEADING_FONT_SIZE = 15
-CANVAS_INFO_FONT = ("Microsoft YaHei UI", 16, "bold")
-CANVAS_TEXT_FONT = ("Microsoft YaHei UI", 14)
-CANVAS_MARK_FONT = ("Microsoft YaHei UI", 13)
+DEFAULT_RETURN_ARRIVE_DISTANCE_M = "0.5"
+LARGE_UI_FONT_SIZE = 11
+LARGE_UI_HEADING_FONT_SIZE = 12
+CANVAS_INFO_FONT = ("Microsoft YaHei UI", 13, "bold")
+CANVAS_TEXT_FONT = ("Microsoft YaHei UI", 11)
+CANVAS_MARK_FONT = ("Microsoft YaHei UI", 10)
 
 
 class SerialReader(threading.Thread):
@@ -92,9 +94,20 @@ class LoraMapViewer:
         self.last_key_node_id = None
         self.total_point_count = 0
         self.file_entries = []
+        self.original_file_entries = []
         self.file_index = 0
         self.file_playing = False
         self.file_return_mode = False
+        self.return_completed = False
+        self.return_home_point = None
+        self.file_edit_selected = set()
+        self.file_edit_range_anchor = None
+        self.file_edit_drag_start = None
+        self.file_edit_drag_view = None
+        self.file_edit_drag_points = {}
+        self.file_edit_drag_snapshot = None
+        self.file_edit_drag_changed = False
+        self.file_edit_undo_stack = []
         self.direction_bias_last_raw_point = None
         self.direction_bias_last_point = None
         self.direction_bias_changed_count = 0
@@ -125,6 +138,9 @@ class LoraMapViewer:
         self.play_interval_var = tk.StringVar(value=DEFAULT_PLAY_INTERVAL_MS)
         self.file_build_map_var = tk.BooleanVar(value=True)
         self.file_navigation_var = tk.BooleanVar(value=True)
+        self.file_edit_var = tk.BooleanVar(value=False)
+        self.file_edit_mode_var = tk.StringVar(value="单点")
+        self.file_edit_auto_yaw_var = tk.BooleanVar(value=True)
         self.direction_bias_var = tk.BooleanVar(value=False)
         self.direction_bias_strength_var = tk.StringVar(value=DEFAULT_DIRECTION_BIAS_STRENGTH)
         self.direction_bias_step_var = tk.StringVar(value=DEFAULT_DIRECTION_BIAS_STEP_M)
@@ -133,8 +149,10 @@ class LoraMapViewer:
         self.return_snap_var = tk.BooleanVar(value=True)
         self.c_engine_var = tk.BooleanVar(value=False)
         self.mirror_display_var = tk.BooleanVar(value=True)
+        self.show_position_arrow_var = tk.BooleanVar(value=True)
         self.snap_distance_var = tk.StringVar(value=DEFAULT_SNAP_DISTANCE_M)
         self.direction_match_var = tk.StringVar(value=DEFAULT_DIRECTION_MATCH_DEG)
+        self.return_arrive_distance_var = tk.StringVar(value=DEFAULT_RETURN_ARRIVE_DISTANCE_M)
 
         self._build_ui()
         self.refresh_ports()
@@ -160,13 +178,13 @@ class LoraMapViewer:
                 pass
 
         style = ttk.Style(self.root)
-        style.configure("TButton", padding=(8, 5))
-        style.configure("TCheckbutton", padding=(4, 4))
-        style.configure("TEntry", padding=(3, 4))
-        style.configure("TCombobox", padding=(3, 4))
+        style.configure("TButton", padding=(6, 3))
+        style.configure("TCheckbutton", padding=(3, 2))
+        style.configure("TEntry", padding=(3, 2))
+        style.configure("TCombobox", padding=(3, 2))
 
     def _build_ui(self):
-        top = ttk.Frame(self.root, padding=(8, 8, 8, 4))
+        top = ttk.Frame(self.root, padding=(8, 5, 8, 3))
         top.pack(side=tk.TOP, fill=tk.X)
 
         serial_row = ttk.Frame(top)
@@ -193,11 +211,11 @@ class LoraMapViewer:
         ttk.Button(serial_row, text="清空", command=self.clear_points).pack(side=tk.LEFT, padx=(12, 4))
 
         status_row = ttk.Frame(top)
-        status_row.pack(side=tk.TOP, fill=tk.X, pady=(6, 0))
+        status_row.pack(side=tk.TOP, fill=tk.X, pady=(3, 0))
         ttk.Label(status_row, textvariable=self.status_var).pack(side=tk.LEFT)
 
         map_row = ttk.Frame(top)
-        map_row.pack(side=tk.TOP, fill=tk.X, pady=(6, 0))
+        map_row.pack(side=tk.TOP, fill=tk.X, pady=(3, 0))
 
         self.manual_check = ttk.Checkbutton(
             map_row,
@@ -220,15 +238,16 @@ class LoraMapViewer:
         ttk.Entry(map_row, textvariable=self.point_limit_var, width=6).pack(side=tk.LEFT, padx=(4, 12))
 
         map_action_row = ttk.Frame(top)
-        map_action_row.pack(side=tk.TOP, fill=tk.X, pady=(6, 0))
+        map_action_row.pack(side=tk.TOP, fill=tk.X, pady=(3, 0))
 
         ttk.Button(map_action_row, text="应用参数", command=self.update_map_from_ui).pack(side=tk.LEFT, padx=(0, 4))
         ttk.Button(map_action_row, text="返航路线", command=self.plan_return_route).pack(side=tk.LEFT, padx=4)
         ttk.Checkbutton(map_action_row, text="C算法", variable=self.c_engine_var, command=self.toggle_c_engine).pack(side=tk.LEFT, padx=(12, 4))
+        ttk.Checkbutton(map_action_row, text="位置箭头", variable=self.show_position_arrow_var, command=self.draw_map).pack(side=tk.LEFT, padx=(12, 4))
         ttk.Checkbutton(map_action_row, text="镜像显示", variable=self.mirror_display_var, command=self.draw_map).pack(side=tk.LEFT, padx=(12, 4))
 
         file_row = ttk.Frame(top)
-        file_row.pack(side=tk.TOP, fill=tk.X, pady=(6, 0))
+        file_row.pack(side=tk.TOP, fill=tk.X, pady=(3, 0))
 
         ttk.Label(file_row, text="轨迹文件").pack(side=tk.LEFT)
         ttk.Entry(file_row, textvariable=self.file_path_var, width=30).pack(side=tk.LEFT, padx=(4, 4), fill=tk.X, expand=True)
@@ -236,7 +255,7 @@ class LoraMapViewer:
         ttk.Button(file_row, text="加载", command=self.load_file).pack(side=tk.LEFT, padx=4)
 
         file_control_row = ttk.Frame(top)
-        file_control_row.pack(side=tk.TOP, fill=tk.X, pady=(6, 0))
+        file_control_row.pack(side=tk.TOP, fill=tk.X, pady=(3, 0))
 
         ttk.Button(file_control_row, text="播放", command=self.start_file_playback).pack(side=tk.LEFT, padx=(0, 4))
         ttk.Button(file_control_row, text="暂停", command=self.pause_file_playback).pack(side=tk.LEFT, padx=4)
@@ -247,8 +266,37 @@ class LoraMapViewer:
         ttk.Checkbutton(file_control_row, text="导航", variable=self.file_navigation_var).pack(side=tk.LEFT, padx=4)
         ttk.Checkbutton(file_control_row, text="返航校正", variable=self.return_snap_var).pack(side=tk.LEFT, padx=4)
 
+        file_edit_row = ttk.Frame(top)
+        file_edit_row.pack(side=tk.TOP, fill=tk.X, pady=(3, 0))
+
+        ttk.Checkbutton(
+            file_edit_row,
+            text="文件编辑",
+            variable=self.file_edit_var,
+            command=self.toggle_file_edit,
+        ).pack(side=tk.LEFT, padx=(0, 12))
+        ttk.Label(file_edit_row, text="选择方式").pack(side=tk.LEFT)
+        self.file_edit_mode_box = ttk.Combobox(
+            file_edit_row,
+            textvariable=self.file_edit_mode_var,
+            width=6,
+            values=("单点", "区段"),
+            state="readonly",
+        )
+        self.file_edit_mode_box.pack(side=tk.LEFT, padx=(4, 12))
+        self.file_edit_mode_box.bind("<<ComboboxSelected>>", self.on_file_edit_mode_changed)
+        ttk.Button(file_edit_row, text="插入点", command=self.insert_file_point).pack(side=tk.LEFT, padx=4)
+        ttk.Button(file_edit_row, text="删除点", command=self.delete_file_points).pack(side=tk.LEFT, padx=4)
+        ttk.Button(file_edit_row, text="撤销", command=self.undo_file_edit).pack(side=tk.LEFT, padx=4)
+        ttk.Button(file_edit_row, text="另存为", command=self.save_edited_file).pack(side=tk.LEFT, padx=(12, 4))
+        ttk.Checkbutton(
+            file_edit_row,
+            text="自动更新航向",
+            variable=self.file_edit_auto_yaw_var,
+        ).pack(side=tk.LEFT, padx=(12, 4))
+
         snap_row = ttk.Frame(top)
-        snap_row.pack(side=tk.TOP, fill=tk.X, pady=(6, 0))
+        snap_row.pack(side=tk.TOP, fill=tk.X, pady=(3, 0))
 
         ttk.Checkbutton(snap_row, text="前进校正", variable=self.forward_snap_var).pack(side=tk.LEFT, padx=(0, 12))
 
@@ -258,8 +306,11 @@ class LoraMapViewer:
         ttk.Label(snap_row, text="方向阈值(°)").pack(side=tk.LEFT)
         ttk.Entry(snap_row, textvariable=self.direction_match_var, width=6).pack(side=tk.LEFT, padx=(4, 12))
 
+        ttk.Label(snap_row, text="返航完成(m)").pack(side=tk.LEFT)
+        ttk.Entry(snap_row, textvariable=self.return_arrive_distance_var, width=6).pack(side=tk.LEFT, padx=(4, 12))
+
         source_row = ttk.Frame(top)
-        source_row.pack(side=tk.TOP, fill=tk.X, pady=(6, 0))
+        source_row.pack(side=tk.TOP, fill=tk.X, pady=(3, 0))
 
         ttk.Checkbutton(source_row, text="四向原始修正", variable=self.direction_bias_var).pack(side=tk.LEFT, padx=(0, 12))
         ttk.Label(source_row, text="四向强度(0-1)").pack(side=tk.LEFT)
@@ -272,7 +323,9 @@ class LoraMapViewer:
         self.canvas = tk.Canvas(self.root, background="#f7f9fb", highlightthickness=0)
         self.canvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         self.canvas.bind("<Configure>", lambda _event: self.draw_map())
-        self.canvas.bind("<Button-1>", self.on_canvas_click)
+        self.canvas.bind("<ButtonPress-1>", self.on_canvas_click)
+        self.canvas.bind("<B1-Motion>", self.on_canvas_drag)
+        self.canvas.bind("<ButtonRelease-1>", self.on_canvas_release)
 
     def refresh_ports(self):
         if list_ports is None:
@@ -326,6 +379,8 @@ class LoraMapViewer:
         self.file_playing = False
         self.file_index = 0
         self.file_return_mode = False
+        self.return_completed = False
+        self.return_home_point = None
         self._reset_map_state(keep_points=False)
         self._reset_source_correction_state()
         self.trace_points = []
@@ -421,7 +476,7 @@ class LoraMapViewer:
         last_key_id = self.c_debug.get("last_key_node_id", -1)
         self.home_node_id = home_id if 0 <= home_id < len(self.graph_nodes) else None
         self.last_key_node_id = last_key_id if 0 <= last_key_id < len(self.graph_nodes) else None
-        self.return_route = self.c_engine.route()
+        self.return_route = self._truncate_return_route_to_arrival_radius(self.c_engine.route())
         self.snap_route_points = list(self.return_route)
 
     def process_queue(self):
@@ -507,6 +562,9 @@ class LoraMapViewer:
             entries.append(("point", point, line, mode))
 
         self.file_entries = entries
+        self.original_file_entries = list(entries)
+        self.file_edit_undo_stack = []
+        self._clear_file_edit_selection()
         self.file_index = 0
         self.file_playing = False
         self.file_return_mode = False
@@ -516,11 +574,327 @@ class LoraMapViewer:
         self.status_var.set("文件已加载: 前进 %d  返航 %d  忽略 %d" % (forward_count, return_count, ignored_count))
         self.draw_map()
 
+    def toggle_file_edit(self):
+        if self.file_edit_var.get():
+            if not self.file_entries:
+                self.file_edit_var.set(False)
+                messagebox.showinfo("文件编辑", "请先加载轨迹文件。")
+                return
+            self.file_playing = False
+            self.manual_mode_var.set(False)
+            self._clear_file_edit_selection()
+            self.status_var.set("文件编辑: 单点可直接拖动；区段需依次选择首点和尾点")
+        else:
+            self._clear_file_edit_selection()
+            self.status_var.set("已退出文件编辑")
+        self.update_manual_cursor()
+        self.draw_map()
+
+    def on_file_edit_mode_changed(self, _event=None):
+        self._clear_file_edit_selection()
+        if self.file_edit_var.get():
+            if self.file_edit_mode_var.get() == "区段":
+                self.status_var.set("区段选择: 先点击首点，再点击尾点")
+            else:
+                self.status_var.set("单点选择: 点击并拖动位置点")
+        self.draw_map()
+
+    def _clear_file_edit_selection(self):
+        self.file_edit_selected = set()
+        self.file_edit_range_anchor = None
+        self.file_edit_drag_start = None
+        self.file_edit_drag_view = None
+        self.file_edit_drag_points = {}
+        self.file_edit_drag_snapshot = None
+        self.file_edit_drag_changed = False
+
+    def _nearest_file_point_index(self, sx, sy, max_distance_px=16.0):
+        view = self._view_params()
+        best_index = None
+        best_distance = max_distance_px
+        for index, entry in enumerate(self.file_entries):
+            if entry[0] != "point":
+                continue
+            x_m, y_m, _z_m, _yaw_deg = entry[1]
+            point_sx, point_sy = self.world_to_screen(x_m, y_m, view)
+            distance = math.hypot(point_sx - sx, point_sy - sy)
+            if distance <= best_distance:
+                best_distance = distance
+                best_index = index
+        return best_index
+
+    def _same_file_point_block(self, first_index, second_index):
+        start = min(first_index, second_index)
+        end = max(first_index, second_index)
+        for entry in self.file_entries[start:end + 1]:
+            if entry[0] == "return_marker":
+                return False
+        return self.file_entries[first_index][3] == self.file_entries[second_index][3]
+
+    def _begin_file_edit_drag(self, event):
+        self.file_edit_drag_view = self._view_params()
+        self.file_edit_drag_start = self._screen_to_world_with_view(
+            event.x,
+            event.y,
+            self.file_edit_drag_view,
+        )
+        self.file_edit_drag_points = {
+            index: self.file_entries[index][1]
+            for index in self.file_edit_selected
+        }
+        self.file_edit_drag_snapshot = list(self.file_entries)
+        self.file_edit_drag_changed = False
+
+    def _handle_file_edit_press(self, event):
+        index = self._nearest_file_point_index(event.x, event.y)
+        if index is None:
+            self.status_var.set("未选中位置点，请靠近轨迹点点击")
+            return
+
+        if self.file_edit_mode_var.get() == "单点":
+            self.file_edit_selected = {index}
+            self.file_edit_range_anchor = None
+            self._begin_file_edit_drag(event)
+            self.status_var.set("已选择第 %d 个文件位置点" % (index + 1))
+            self.draw_map()
+            return
+
+        if self.file_edit_range_anchor is None and index in self.file_edit_selected:
+            self._begin_file_edit_drag(event)
+            return
+
+        if self.file_edit_range_anchor is None:
+            self.file_edit_range_anchor = index
+            self.file_edit_selected = {index}
+            self.status_var.set("区段首点: %d，请选择尾点" % (index + 1))
+            self.draw_map()
+            return
+
+        anchor = self.file_edit_range_anchor
+        if not self._same_file_point_block(anchor, index):
+            self.file_edit_range_anchor = index
+            self.file_edit_selected = {index}
+            self.status_var.set("区段不能跨越R标记，已重新选择首点")
+            self.draw_map()
+            return
+
+        start = min(anchor, index)
+        end = max(anchor, index)
+        self.file_edit_selected = {
+            item_index
+            for item_index in range(start, end + 1)
+            if self.file_entries[item_index][0] == "point"
+        }
+        self.file_edit_range_anchor = None
+        self.status_var.set("已选择区段: %d 个点，再次按住区段可整体拖动" % len(self.file_edit_selected))
+        self.draw_map()
+
+    def on_canvas_drag(self, event):
+        if not self.file_edit_var.get() or self.file_edit_drag_start is None:
+            return
+
+        current_x, current_y = self._screen_to_world_with_view(
+            event.x,
+            event.y,
+            self.file_edit_drag_view,
+        )
+        dx = current_x - self.file_edit_drag_start[0]
+        dy = current_y - self.file_edit_drag_start[1]
+        if math.hypot(dx, dy) <= 1e-9:
+            return
+
+        for index, original_point in self.file_edit_drag_points.items():
+            x_m, y_m, z_m, yaw_deg = original_point
+            point = (x_m + dx, y_m + dy, z_m, yaw_deg)
+            self._replace_file_point(index, point)
+        self.file_edit_drag_changed = True
+        self.draw_map()
+
+    def on_canvas_release(self, _event):
+        if not self.file_edit_var.get() or self.file_edit_drag_start is None:
+            return
+
+        changed = self.file_edit_drag_changed
+        snapshot = self.file_edit_drag_snapshot
+        self.file_edit_drag_start = None
+        self.file_edit_drag_view = None
+        self.file_edit_drag_points = {}
+        self.file_edit_drag_snapshot = None
+        self.file_edit_drag_changed = False
+        if not changed:
+            return
+
+        self._push_file_edit_undo(snapshot)
+        if self.file_edit_auto_yaw_var.get():
+            self._recalculate_file_yaws()
+        self._on_file_entries_changed("轨迹位置已修正")
+
+    def _replace_file_point(self, index, point):
+        _kind, _old_point, _line, mode = self.file_entries[index]
+        self.file_entries[index] = ("point", point, self._format_file_point(point), mode)
+
+    def _format_file_point(self, point):
+        x_m, y_m, z_m, yaw_deg = point
+        return "%d,%d,%d,%d" % (
+            round(x_m * 1000.0),
+            round(y_m * 1000.0),
+            round(z_m * 1000.0),
+            round(yaw_deg * 100.0),
+        )
+
+    def _push_file_edit_undo(self, snapshot=None):
+        source = self.file_entries if snapshot is None else snapshot
+        self.file_edit_undo_stack.append(list(source))
+        if len(self.file_edit_undo_stack) > 30:
+            del self.file_edit_undo_stack[0]
+
+    def _recalculate_file_yaws(self):
+        run = []
+        for index, entry in enumerate(self.file_entries):
+            if entry[0] == "point":
+                run.append(index)
+            else:
+                self._recalculate_file_yaw_run(run)
+                run = []
+        self._recalculate_file_yaw_run(run)
+
+    def _recalculate_file_yaw_run(self, indices):
+        if len(indices) < 2:
+            return
+        for position, index in enumerate(indices):
+            if position < len(indices) - 1:
+                other_index = indices[position + 1]
+                dx = self.file_entries[other_index][1][0] - self.file_entries[index][1][0]
+                dy = self.file_entries[other_index][1][1] - self.file_entries[index][1][1]
+            else:
+                other_index = indices[position - 1]
+                dx = self.file_entries[index][1][0] - self.file_entries[other_index][1][0]
+                dy = self.file_entries[index][1][1] - self.file_entries[other_index][1][1]
+            if math.hypot(dx, dy) <= 1e-9:
+                continue
+            x_m, y_m, z_m, _yaw_deg = self.file_entries[index][1]
+            yaw_deg = math.degrees(math.atan2(dx, dy))
+            self._replace_file_point(index, (x_m, y_m, z_m, yaw_deg))
+
+    def insert_file_point(self):
+        if not self.file_edit_var.get() or not self.file_edit_selected:
+            messagebox.showinfo("插入点", "请在文件编辑模式下先选择一个点或区段。")
+            return
+
+        base_index = max(self.file_edit_selected)
+        base_entry = self.file_entries[base_index]
+        next_index = None
+        for index in range(base_index + 1, len(self.file_entries)):
+            entry = self.file_entries[index]
+            if entry[0] == "return_marker":
+                break
+            if entry[0] == "point":
+                next_index = index
+                break
+
+        self._push_file_edit_undo()
+        x_m, y_m, z_m, yaw_deg = base_entry[1]
+        if next_index is not None:
+            next_point = self.file_entries[next_index][1]
+            new_point = (
+                (x_m + next_point[0]) * 0.5,
+                (y_m + next_point[1]) * 0.5,
+                (z_m + next_point[2]) * 0.5,
+                yaw_deg,
+            )
+        else:
+            yaw_rad = math.radians(yaw_deg)
+            new_point = (x_m + math.sin(yaw_rad), y_m + math.cos(yaw_rad), z_m, yaw_deg)
+
+        insert_index = base_index + 1
+        self.file_entries.insert(
+            insert_index,
+            ("point", new_point, self._format_file_point(new_point), base_entry[3]),
+        )
+        self.file_edit_selected = {insert_index}
+        self.file_edit_range_anchor = None
+        if self.file_edit_auto_yaw_var.get():
+            self._recalculate_file_yaws()
+        self._on_file_entries_changed("已插入位置点")
+
+    def delete_file_points(self):
+        selected = sorted(self.file_edit_selected, reverse=True)
+        if not self.file_edit_var.get() or not selected:
+            messagebox.showinfo("删除点", "请在文件编辑模式下选择要删除的点。")
+            return
+
+        self._push_file_edit_undo()
+        for index in selected:
+            if 0 <= index < len(self.file_entries) and self.file_entries[index][0] == "point":
+                del self.file_entries[index]
+        deleted_count = len(selected)
+        self._clear_file_edit_selection()
+        if self.file_edit_auto_yaw_var.get():
+            self._recalculate_file_yaws()
+        self._on_file_entries_changed("已删除 %d 个位置点" % deleted_count)
+
+    def undo_file_edit(self):
+        if not self.file_edit_var.get():
+            messagebox.showinfo("撤销", "请先启用文件编辑。")
+            return
+        if not self.file_edit_undo_stack:
+            self.status_var.set("没有可以撤销的文件修改")
+            return
+
+        self.file_entries = self.file_edit_undo_stack.pop()
+        self._clear_file_edit_selection()
+        self._on_file_entries_changed("已撤销上一次文件修改")
+
+    def save_edited_file(self):
+        if not self.file_entries:
+            messagebox.showinfo("另存为", "当前没有可保存的轨迹文件。")
+            return
+
+        source_path = self.file_path_var.get().strip()
+        source_name = os.path.basename(source_path) if source_path else "track.txt"
+        base_name, extension = os.path.splitext(source_name)
+        if not extension:
+            extension = ".txt"
+        path = filedialog.asksaveasfilename(
+            title="保存修正后的轨迹",
+            initialdir=os.path.dirname(source_path) if source_path else None,
+            initialfile=base_name + "_edited" + extension,
+            defaultextension=".txt",
+            filetypes=(("文本文件", "*.txt"), ("所有文件", "*.*")),
+        )
+        if not path:
+            return
+
+        try:
+            with open(path, "w", encoding="gbk", newline="\n") as file_obj:
+                for entry in self.file_entries:
+                    if entry[0] == "return_marker":
+                        file_obj.write("R\n")
+                    else:
+                        file_obj.write(self._format_file_point(entry[1]) + "\n")
+        except OSError as exc:
+            messagebox.showerror("保存失败", str(exc))
+            return
+
+        self.file_path_var.set(path)
+        self.status_var.set("修正后的轨迹已保存: %s" % path)
+
+    def _on_file_entries_changed(self, message):
+        self.file_playing = False
+        self._reset_file_playback_state()
+        self.status_var.set("%s，地图已重置，可重新播放建图" % message)
+        self.draw_map()
+
     def start_file_playback(self):
         if not self.file_entries:
             self.load_file()
         if not self.file_entries:
             return
+
+        if self.file_edit_var.get():
+            self.file_edit_var.set(False)
+            self._clear_file_edit_selection()
+            self.update_manual_cursor()
 
         if self.file_index >= len(self.file_entries):
             self._reset_file_playback_state()
@@ -539,6 +913,10 @@ class LoraMapViewer:
             self.load_file()
         if not self.file_entries:
             return
+        if self.file_edit_var.get():
+            self.file_edit_var.set(False)
+            self._clear_file_edit_selection()
+            self.update_manual_cursor()
         if self.file_index == 0:
             self._reset_file_playback_state()
         self._process_next_file_entry()
@@ -546,6 +924,8 @@ class LoraMapViewer:
     def _reset_file_playback_state(self):
         self.file_index = 0
         self.file_return_mode = False
+        self.return_completed = False
+        self.return_home_point = None
         self._reset_map_state(keep_points=False)
         self._reset_source_correction_state()
         self.trace_points = []
@@ -572,7 +952,10 @@ class LoraMapViewer:
 
         if not self._process_next_file_entry():
             self.file_playing = False
-            self.status_var.set("文件回放完成: %d/%d" % (self.file_index, len(self.file_entries)))
+            if self.return_completed:
+                self.status_var.set("文件回放完成，返航成功")
+            else:
+                self.status_var.set("文件回放完成: %d/%d" % (self.file_index, len(self.file_entries)))
             return
 
         self._schedule_file_step()
@@ -586,6 +969,7 @@ class LoraMapViewer:
         if entry[0] == "return_marker":
             _kind, _point, line = entry
             self.file_return_mode = True
+            self.return_completed = False
             self.last_line = line
             if self.c_engine_var.get() and self.c_engine is not None:
                 if self.file_navigation_var.get():
@@ -598,14 +982,20 @@ class LoraMapViewer:
                 self._start_return_navigation()
             else:
                 self.return_route = []
-            if not self.c_engine_var.get():
+            if self.points:
+                self._check_return_arrival(self.points[-1])
+            if not self.return_completed and not self.c_engine_var.get():
                 self.status_var.set("检测到返航包: %d/%d" % (self.file_index, len(self.file_entries)))
             self.draw_map()
             return True
 
         _kind, point, line, mode = entry
         build_map = mode == "forward" and self.file_build_map_var.get()
-        update_navigation = mode == "return" and self.file_navigation_var.get()
+        update_navigation = (
+            mode == "return"
+            and self.file_navigation_var.get()
+            and not self.return_completed
+        )
         self.add_point(
             point,
             line,
@@ -617,6 +1007,10 @@ class LoraMapViewer:
         return True
 
     def add_point(self, point, line, mode="forward", build_map=True, update_navigation=False, from_file=False):
+        if not from_file and self.file_return_mode:
+            mode = "return"
+            build_map = False
+            update_navigation = not self.return_completed
         if self.c_engine_var.get():
             self._add_point_with_c_engine(point, line, mode, build_map, update_navigation, from_file)
             return
@@ -632,6 +1026,8 @@ class LoraMapViewer:
             else:
                 self.forward_snap_edge = None
             self.forward_snap_points.append(map_point)
+            if self.return_home_point is None:
+                self.return_home_point = map_point
             if self._distance_2d(point, map_point) > 1e-6:
                 self.forward_snap_changed_count += 1
         if mode == "return":
@@ -645,6 +1041,7 @@ class LoraMapViewer:
         if params is not None:
             turn_angle_deg, min_segment_m, merge_distance_m, point_limit = params
             self._trim_points(point_limit)
+            arrival_point = point
             if build_map:
                 self._update_incremental_map(turn_angle_deg, min_segment_m, merge_distance_m)
             elif update_navigation:
@@ -654,14 +1051,18 @@ class LoraMapViewer:
                 if snapped_point is not None:
                     self.return_snap_points.append(snapped_point)
                     self._update_return_route_from_snap(snapped_point)
+                    arrival_point = snapped_point
                 else:
                     self._preview_return_navigation(point, merge_distance_m)
-            self.status_var.set("采样: %d  缓存: %d  关键点: %d  地图节点: %d" % (
-                self.total_point_count,
-                len(self.points),
-                len(self.key_points),
-                len(self.graph_nodes),
-            ))
+            if mode == "return" and update_navigation:
+                self._check_return_arrival(arrival_point)
+            if not self.return_completed:
+                self.status_var.set("采样: %d  缓存: %d  关键点: %d  地图节点: %d" % (
+                    self.total_point_count,
+                    len(self.points),
+                    len(self.key_points),
+                    len(self.graph_nodes),
+                ))
         self.draw_map()
 
     def _add_point_with_c_engine(self, point, line, mode, build_map, update_navigation, from_file):
@@ -683,6 +1084,8 @@ class LoraMapViewer:
                 (effective_mode == "forward" and build_map)
                 or (effective_mode == "return" and update_navigation)
             )
+        if effective_mode == "return" and self.return_completed:
+            should_process = False
 
         corrected_point = point
         result = None
@@ -693,9 +1096,11 @@ class LoraMapViewer:
 
         if effective_mode == "forward":
             self.forward_snap_points.append(corrected_point)
+            if self.return_home_point is None:
+                self.return_home_point = corrected_point
             if self._distance_2d(point, corrected_point) > 1e-6:
                 self.forward_snap_changed_count += 1
-        elif self.return_snap_var.get():
+        elif self.return_snap_var.get() and not self.return_completed:
             self.return_snap_points.append(corrected_point)
 
         self.points.append(corrected_point)
@@ -705,7 +1110,12 @@ class LoraMapViewer:
         if params is not None:
             self._trim_points(params[3])
 
-        if result is None:
+        if effective_mode == "return" and should_process:
+            self._check_return_arrival(corrected_point)
+
+        if self.return_completed:
+            pass
+        elif result is None:
             self.status_var.set("C算法未处理此点: 文件建图或导航未开启")
         else:
             last_us = self.c_debug.get("last_process_us", 0)
@@ -722,10 +1132,21 @@ class LoraMapViewer:
         self.draw_map()
 
     def update_manual_cursor(self):
-        cursor = "crosshair" if self.manual_mode_var.get() else ""
+        if self.manual_mode_var.get() and self.file_edit_var.get():
+            self.file_edit_var.set(False)
+            self._clear_file_edit_selection()
+        if self.file_edit_var.get():
+            cursor = "fleur"
+        elif self.manual_mode_var.get():
+            cursor = "crosshair"
+        else:
+            cursor = ""
         self.canvas.configure(cursor=cursor)
 
     def on_canvas_click(self, event):
+        if self.file_edit_var.get():
+            self._handle_file_edit_press(event)
+            return
         if not self.manual_mode_var.get():
             return
 
@@ -743,7 +1164,7 @@ class LoraMapViewer:
 
     def update_map_from_ui(self):
         params = self._read_map_params(show_error=True)
-        if params is None:
+        if params is None or self._read_return_arrive_distance(show_error=True) is None:
             return
         if self.c_engine_var.get():
             if not self._initialize_c_engine(show_error=True):
@@ -819,6 +1240,111 @@ class LoraMapViewer:
             return None
 
         return snap_distance_m, direction_match_deg
+
+    def _read_return_arrive_distance(self, show_error):
+        try:
+            distance_m = float(self.return_arrive_distance_var.get().strip())
+        except ValueError:
+            if show_error:
+                messagebox.showerror("参数无效", "返航完成距离必须是数字。")
+            else:
+                self.status_var.set("返航完成距离无效")
+            return None
+
+        if distance_m < 0.0:
+            if show_error:
+                messagebox.showerror("参数无效", "返航完成距离不能小于0。")
+            else:
+                self.status_var.set("返航完成距离无效")
+            return None
+        return distance_m
+
+    def _check_return_arrival(self, point):
+        if self.return_completed or not self.file_return_mode:
+            return False
+        threshold_m = self._read_return_arrive_distance(show_error=False)
+        if threshold_m is None:
+            return False
+
+        home_xy = self._return_home_xy()
+        if home_xy is None:
+            return False
+        home_x, home_y = home_xy
+
+        distance_m = math.hypot(point[0] - home_x, point[1] - home_y)
+        if distance_m > threshold_m:
+            return False
+
+        self.return_completed = True
+        self.return_route = []
+        self.snap_route_points = []
+        self.status_var.set(
+            "返航成功: 距离出发点 %.2fm  阈值 %.2fm" % (distance_m, threshold_m)
+        )
+        return True
+
+    def _return_home_xy(self):
+        if self.return_home_point is not None:
+            return self.return_home_point[0], self.return_home_point[1]
+        if self.home_node_id is not None and self.home_node_id < len(self.graph_nodes):
+            return self.graph_nodes[self.home_node_id]
+        return None
+
+    def _truncate_return_route_to_arrival_radius(self, route_points):
+        if not route_points:
+            return []
+        threshold_m = self._read_return_arrive_distance(show_error=False)
+        home_xy = self._return_home_xy()
+        if threshold_m is None or home_xy is None:
+            return list(route_points)
+
+        result = [route_points[0]]
+        if self._distance_xy(route_points[0], home_xy) <= threshold_m:
+            return result
+
+        for index in range(len(route_points) - 1):
+            start_xy = route_points[index]
+            end_xy = route_points[index + 1]
+            entry_xy = self._segment_circle_first_entry(start_xy, end_xy, home_xy, threshold_m)
+            if entry_xy is not None:
+                if self._distance_xy(result[-1], entry_xy) > 1e-9:
+                    result.append(entry_xy)
+                return result
+            result.append(end_xy)
+        return result
+
+    def _segment_circle_first_entry(self, start_xy, end_xy, center_xy, radius_m):
+        start_dx = start_xy[0] - center_xy[0]
+        start_dy = start_xy[1] - center_xy[1]
+        if math.hypot(start_dx, start_dy) <= radius_m:
+            return start_xy
+
+        segment_dx = end_xy[0] - start_xy[0]
+        segment_dy = end_xy[1] - start_xy[1]
+        a = segment_dx * segment_dx + segment_dy * segment_dy
+        if a < 1e-12:
+            return None
+        b = 2.0 * (start_dx * segment_dx + start_dy * segment_dy)
+        c = start_dx * start_dx + start_dy * start_dy - radius_m * radius_m
+        discriminant = b * b - 4.0 * a * c
+        if discriminant < 0.0:
+            return None
+
+        root = math.sqrt(max(0.0, discriminant))
+        for position in sorted(((-b - root) / (2.0 * a), (-b + root) / (2.0 * a))):
+            if -1e-9 <= position <= 1.0 + 1e-9:
+                position = max(0.0, min(1.0, position))
+                return (
+                    start_xy[0] + segment_dx * position,
+                    start_xy[1] + segment_dy * position,
+                )
+        return None
+
+    def _route_length(self, route_points):
+        return sum(
+            self._distance_xy(route_points[index], route_points[index + 1])
+            for index in range(len(route_points) - 1)
+        )
 
     def _read_direction_bias_params(self, show_error):
         try:
@@ -995,9 +1521,9 @@ class LoraMapViewer:
 
         route_ids, _distance_m = self._shortest_path(start_id, self.home_node_id)
         route_points = self._route_ids_to_points(self.graph_nodes, route_ids)
-        self.return_route = route_points
+        self.return_route = self._truncate_return_route_to_arrival_radius(route_points)
         # 返航校正以关键点图上的最短返航路线为基准，而不是单纯沿首次轨迹反向。
-        self.snap_route_points = list(route_points)
+        self.snap_route_points = list(self.return_route)
         self.snap_segment_index = 0
 
     def _snap_return_point(self, point):
@@ -1214,7 +1740,8 @@ class LoraMapViewer:
             self._connect_temp_point_to_graph(nodes, edges, start_id, merge_distance_m)
 
         route_ids, _distance_m = self._shortest_path_in_graph(edges, start_id, self.home_node_id)
-        self.return_route = self._route_ids_to_points(nodes, route_ids)
+        route_points = self._route_ids_to_points(nodes, route_ids)
+        self.return_route = self._truncate_return_route_to_arrival_radius(route_points)
 
     def _connect_temp_point_to_graph(self, nodes, edges, start_id, merge_distance_m):
         start_xy = nodes[start_id]
@@ -1587,6 +2114,7 @@ class LoraMapViewer:
         if not self.points:
             messagebox.showinfo("返航路线", "还没有位置点。")
             return
+        self.return_completed = False
 
         if self.c_engine_var.get():
             if self.c_engine is None and not self._initialize_c_engine(show_error=True):
@@ -1594,6 +2122,9 @@ class LoraMapViewer:
             result = self.c_engine.enter_return()
             self.file_return_mode = True
             self._sync_c_map_state()
+            if self._check_return_arrival(self.points[-1]):
+                self.draw_map()
+                return
             if result["route_valid"]:
                 self.status_var.set(
                     "C返航路线: 下一关键点 %.2fm  路线点: %d" % (
@@ -1618,12 +2149,19 @@ class LoraMapViewer:
             messagebox.showinfo("返航路线", "地图节点不足。")
             return
 
+        self.file_return_mode = True
         home_id = self.home_node_id
         route, distance_m = self._shortest_path(start_id, home_id)
-        self.return_route = self._route_ids_to_points(self.graph_nodes, route)
+        route_points = self._route_ids_to_points(self.graph_nodes, route)
+        self.return_route = self._truncate_return_route_to_arrival_radius(route_points)
+        distance_m = self._route_length(self.return_route)
         # 手动触发返航时，同样使用图上的最短路线作为校正基准。
         self.snap_route_points = list(self.return_route)
         self.snap_segment_index = 0
+
+        if self._check_return_arrival(self.points[-1]):
+            self.draw_map()
+            return
 
         if route:
             self.status_var.set("返航路线: %.2fm  节点: %d" % (distance_m, len(route)))
@@ -1708,6 +2246,7 @@ class LoraMapViewer:
         self._draw_return_route(canvas, world_to_screen)
         self._draw_return_snap_points(canvas, world_to_screen)
         self._draw_key_points(canvas, world_to_screen)
+        self._draw_file_editor(canvas, world_to_screen)
 
         if self.points:
             self._draw_current_point(canvas, world_to_screen)
@@ -1750,6 +2289,9 @@ class LoraMapViewer:
 
     def screen_to_world(self, sx, sy):
         view = self._view_params()
+        return self._screen_to_world_with_view(sx, sy, view)
+
+    def _screen_to_world_with_view(self, sx, sy, view):
         min_x, _max_x, min_y, _max_y = view["bounds"]
         margin = view["margin"]
         height = view["height"]
@@ -1782,6 +2324,13 @@ class LoraMapViewer:
         for x_m, y_m in self.return_route:
             xs.append(x_m)
             ys.append(y_m)
+        if self.file_edit_var.get():
+            for entries in (self.original_file_entries, self.file_entries):
+                for entry in entries:
+                    if entry[0] != "point":
+                        continue
+                    xs.append(entry[1][0])
+                    ys.append(entry[1][1])
 
         min_x = min(xs)
         max_x = max(xs)
@@ -1793,6 +2342,73 @@ class LoraMapViewer:
         half = span * 0.5
         pad = span * 0.12
         return center_x - half - pad, center_x + half + pad, center_y - half - pad, center_y + half + pad
+
+    def _file_entry_segments(self, entries):
+        segments = []
+        current = []
+        current_mode = None
+        for entry in entries:
+            if entry[0] != "point":
+                if current:
+                    segments.append((current_mode, current))
+                current = []
+                current_mode = None
+                continue
+
+            mode = entry[3]
+            if current and mode != current_mode:
+                segments.append((current_mode, current))
+                current = []
+            current_mode = mode
+            current.append(entry[1])
+        if current:
+            segments.append((current_mode, current))
+        return segments
+
+    def _draw_file_editor(self, canvas, world_to_screen):
+        if not self.file_edit_var.get() or not self.file_entries:
+            return
+
+        # 原始文件只作对照，编辑后的数据才会用于重新播放和建图。
+        for _mode, points in self._file_entry_segments(self.original_file_entries):
+            if len(points) < 2:
+                continue
+            coords = []
+            for x_m, y_m, _z_m, _yaw_deg in points:
+                coords.extend(world_to_screen(x_m, y_m))
+            canvas.create_line(*coords, fill="#9e9e9e", width=2, dash=(5, 4))
+
+        colors = {"forward": "#1565c0", "return": "#c62828"}
+        for mode, points in self._file_entry_segments(self.file_entries):
+            if len(points) < 2:
+                continue
+            coords = []
+            for x_m, y_m, _z_m, _yaw_deg in points:
+                coords.extend(world_to_screen(x_m, y_m))
+            canvas.create_line(*coords, fill=colors.get(mode, "#37474f"), width=3)
+
+        for index, entry in enumerate(self.file_entries):
+            if entry[0] != "point":
+                continue
+            x_m, y_m, _z_m, _yaw_deg = entry[1]
+            sx, sy = world_to_screen(x_m, y_m)
+            if index in self.file_edit_selected:
+                radius = 6
+                fill = "#ff9800"
+                outline = "#e65100"
+            else:
+                radius = 2
+                fill = colors.get(entry[3], "#37474f")
+                outline = fill
+            canvas.create_oval(
+                sx - radius,
+                sy - radius,
+                sx + radius,
+                sy + radius,
+                fill=fill,
+                outline=outline,
+                width=2 if index in self.file_edit_selected else 1,
+            )
 
     def _draw_grid(self, canvas, world_to_screen, bounds):
         min_x, max_x, min_y, max_y = bounds
@@ -1836,6 +2452,8 @@ class LoraMapViewer:
         sx, sy = world_to_screen(x_m, y_m)
         canvas.create_oval(sx - 6, sy - 6, sx + 6, sy + 6, fill="#e53935", outline="")
 
+        if not self.show_position_arrow_var.get():
+            return
         yaw_rad = math.radians(yaw_deg)
         arrow_len = 36
         ex = sx + math.sin(yaw_rad) * arrow_len

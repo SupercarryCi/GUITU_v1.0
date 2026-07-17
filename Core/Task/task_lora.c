@@ -353,7 +353,7 @@ void Task_LoraEntry(void *argument)
 
         /*
          * 先等待DIO1或导航周期，再统一轮询IRQ。即使EXTI漏触发，
-         * 最长也会在下一个500ms导航周期处理已完成的接收。
+         * 最长也会在下一个导航周期处理已完成的接收。
          */
         (void)osEventFlagsWait(g_sysEventFlags,
                                SYS_EVT_LORA_DIO1,

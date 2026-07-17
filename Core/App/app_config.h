@@ -50,7 +50,7 @@ extern "C" {
 #define APP_SPO2_WEAR_IR_DC_MIN     0U
 #define APP_SPO2_WEAR_RED_DC_MIN    0U
 
-#define APP_LORA_PERIOD_MS          500U        /* LoRa 导航位置发送/收发轮询周期 (2Hz) */
+#define APP_LORA_PERIOD_MS          1000U       /* LoRa 导航位置发送/收发轮询周期 (1Hz) */
 #define APP_RETURN_PERIOD_MS        100U        /* 返航控制周期 (10Hz) */
 
 /* 气体报警阈值，传感器标定后只需要调整这里。 */
