@@ -27,6 +27,10 @@
 #define HR_FIFO_SIZE                 7
 #define MA4_SIZE                     4
 #define HAMMING_SIZE                 5
+#define MAX30102_HR_MIN_BPM        60
+#define MAX30102_HR_MAX_BPM        160
+#define MAX30102_HR_MAX_PEAKS      15
+#define MAX30102_HR_PEAK_MIN_DISTANCE ((FS * 60) / MAX30102_HR_MAX_BPM)
 #ifndef min
 #define min(x, y)                    ((x) < (y) ? (x) : (y))
 #endif
@@ -289,10 +293,11 @@ void maxim_heart_rate_and_oxygen_saturation(uint32_t *pun_ir_buffer,  int32_t n_
     int32_t k ,n_i_ratio_count;
     int32_t i, s, m, n_exact_ir_valley_locs_count ,n_middle_idx;
     int32_t n_th1, n_npks,n_c_min;      
-    int32_t an_ir_valley_locs[15] ;
-    int32_t an_exact_ir_valley_locs[15] ;
-    int32_t an_dx_peak_locs[15] ;
-    int32_t n_peak_interval_sum;
+    int32_t an_ir_valley_locs[MAX30102_HR_MAX_PEAKS] ;
+    int32_t an_exact_ir_valley_locs[MAX30102_HR_MAX_PEAKS] ;
+    int32_t an_dx_peak_locs[MAX30102_HR_MAX_PEAKS] ;
+    int32_t n_peak_interval;
+    int32_t n_peak_interval_count;
     
     int32_t n_y_ac, n_x_ac;
     int32_t n_spo2_calc; 
@@ -339,19 +344,41 @@ void maxim_heart_rate_and_oxygen_saturation(uint32_t *pun_ir_buffer,  int32_t n_
     }
     n_th1= n_th1/ ( BUFFER_SIZE-HAMMING_SIZE);
     // peak location is acutally index for sharpest location of raw signal since we flipped the signal         
-    maxim_find_peaks( an_dx_peak_locs, &n_npks, an_dx, BUFFER_SIZE-HAMMING_SIZE, n_th1, 8, 5 );//peak_height, peak_distance, max_num_peaks 
+    maxim_find_peaks( an_dx_peak_locs,
+                      &n_npks,
+                      an_dx,
+                      BUFFER_SIZE-HAMMING_SIZE,
+                      n_th1,
+                      MAX30102_HR_PEAK_MIN_DISTANCE,
+                      MAX30102_HR_MAX_PEAKS );
 
-    n_peak_interval_sum =0;
-    if (n_npks>=2){
-        for (k=1; k<n_npks; k++)
-            n_peak_interval_sum += (an_dx_peak_locs[k]-an_dx_peak_locs[k -1]);
-        n_peak_interval_sum=n_peak_interval_sum/(n_npks-1);
-        *pn_heart_rate=(int32_t)(6000/n_peak_interval_sum);// beats per minutes
-        *pch_hr_valid  = 1;
+    if (n_npks >= 3){
+        n_peak_interval_count = n_npks - 1;
+        for (k=0; k<n_peak_interval_count; k++)
+            an_ir_valley_locs[k] = an_dx_peak_locs[k+1] - an_dx_peak_locs[k];
+
+        /* 使用峰间距中位数，避免单个漏峰或杂峰直接拉偏心率。 */
+        maxim_sort_ascend(an_ir_valley_locs, n_peak_interval_count);
+        n_middle_idx = n_peak_interval_count / 2;
+        if ((n_peak_interval_count & 1) == 0)
+            n_peak_interval = (an_ir_valley_locs[n_middle_idx-1] +
+                               an_ir_valley_locs[n_middle_idx]) / 2;
+        else
+            n_peak_interval = an_ir_valley_locs[n_middle_idx];
+
+        if (n_peak_interval > 0){
+            *pn_heart_rate = (int32_t)((FS * 60) / n_peak_interval);
+            *pch_hr_valid = ((*pn_heart_rate >= MAX30102_HR_MIN_BPM) &&
+                             (*pn_heart_rate <= MAX30102_HR_MAX_BPM)) ? 1 : 0;
+        }
+        else {
+            *pn_heart_rate = -999;
+            *pch_hr_valid = 0;
+        }
     }
-    else  {
+    else {
         *pn_heart_rate = -999;
-        *pch_hr_valid  = 0;
+        *pch_hr_valid = 0;
     }
             
     for ( k=0 ; k<n_npks ;k++)
@@ -378,7 +405,7 @@ void maxim_heart_rate_and_oxygen_saturation(uint32_t *pun_ir_buffer,  int32_t n_
                        un_only_once =0;
                    } 
                    n_c_min= an_x[i] ;
-                   an_exact_ir_valley_locs[k]=i;
+                   an_exact_ir_valley_locs[n_exact_ir_valley_locs_count]=i;
                 }
             if (un_only_once ==0)
                 n_exact_ir_valley_locs_count ++ ;
@@ -426,7 +453,7 @@ void maxim_heart_rate_and_oxygen_saturation(uint32_t *pun_ir_buffer,  int32_t n_
             n_y_ac=  an_y[n_y_dc_max_idx] - n_y_ac;    // subracting linear DC compoenents from raw 
             n_x_ac= (an_x[an_exact_ir_valley_locs[k+1]] - an_x[an_exact_ir_valley_locs[k] ] )*(n_x_dc_max_idx -an_exact_ir_valley_locs[k]); // ir
             n_x_ac=  an_x[an_exact_ir_valley_locs[k]] + n_x_ac/ (an_exact_ir_valley_locs[k+1] - an_exact_ir_valley_locs[k]); 
-            n_x_ac=  an_x[n_y_dc_max_idx] - n_x_ac;      // subracting linear DC compoenents from raw 
+            n_x_ac=  an_x[n_x_dc_max_idx] - n_x_ac;      // subracting linear DC compoenents from raw 
             n_nume=( n_y_ac *n_x_dc_max)>>7 ; //prepare X100 to preserve floating value
             n_denom= ( n_x_ac *n_y_dc_max)>>7;
             if (n_denom>0  && n_i_ratio_count <5 &&  n_nume != 0)
@@ -488,7 +515,7 @@ void maxim_peaks_above_min_height(int32_t *pn_locs, int32_t *pn_npks, int32_t  *
             n_width = 1;
             while (i+n_width < n_size && pn_x[i] == pn_x[i+n_width])    // find flat peaks
                 n_width++;
-            if (pn_x[i] > pn_x[i+n_width] && (*pn_npks) < 15 ){                            // find right edge of peaks
+            if (pn_x[i] > pn_x[i+n_width] && (*pn_npks) < MAX30102_HR_MAX_PEAKS ){                            // find right edge of peaks
                 pn_locs[(*pn_npks)++] = i;        
                 // for flat peaks, peak location is left edge
                 i += n_width+1;

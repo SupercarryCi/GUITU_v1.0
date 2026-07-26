@@ -11,8 +11,8 @@
 #include <string.h>
 
 #define TASK_SPO2_RECALC_SAMPLES     100U
-#define TASK_SPO2_MOCK_ENABLE        1U  /* 纯屏幕假数据模式：不访问 MAX30102。 */
-#define TASK_SPO2_GENERATED_OUTPUT_ENABLE 1U
+#define TASK_SPO2_MOCK_ENABLE        0U  /* 读取真实反射值，心率/血氧仍使用稳定生成值。 */
+#define TASK_SPO2_GENERATED_OUTPUT_ENABLE 1U  /* 确认佩戴后输出稳定生成的心率和血氧。 */
 #define TASK_SPO2_REFLECT_LOG_ENABLE 1U  /* 串口保留反射窗口输出，用于标定佩戴阈值。 */
 #define TASK_SPO2_MOCK_PERIOD_MS     1000U
 #define TASK_SPO2_MOCK_HR_MIN        80U
@@ -22,6 +22,11 @@
 #define TASK_SPO2_WEAR_WINDOW_SAMPLES MAX30102_SAMPLE_RATE_HZ
 #define TASK_SPO2_WEAR_CONFIRM_WINDOWS 3U
 #define TASK_SPO2_WEAR_RELEASE_WINDOWS 2U
+#define TASK_SPO2_HR_MIN_BPM       60U
+#define TASK_SPO2_HR_MAX_BPM       160U
+#define TASK_SPO2_HR_STABLE_DELTA  10U
+#define TASK_SPO2_HR_CONFIRM_COUNT 3U
+#define TASK_SPO2_HR_STALE_COUNT   3U
 
 #if ((APP_SPO2_WEAR_IR_DC_MIN != 0U) && \
      (APP_SPO2_WEAR_RED_DC_MIN != 0U))
@@ -63,6 +68,15 @@ typedef struct
 #endif
 
 #if (TASK_SPO2_GENERATED_OUTPUT_ENABLE == 0U)
+typedef struct
+{
+    uint16_t output;
+    uint16_t candidate;
+    uint8_t output_valid;
+    uint8_t candidate_count;
+    uint8_t stale_count;
+} TaskSpo2HeartFilter_t;
+
 static uint32_t s_spo2_red_buffer[MAX30102_ALGO_BUFFER_SIZE];
 static uint32_t s_spo2_ir_buffer[MAX30102_ALGO_BUFFER_SIZE];
 static uint32_t s_spo2_calc_red_buffer[MAX30102_ALGO_BUFFER_SIZE];
@@ -71,6 +85,7 @@ static uint16_t s_spo2_write_index = 0U;
 static uint16_t s_spo2_sample_count = 0U;
 static uint16_t s_spo2_samples_since_calc = 0U;
 static uint8_t s_spo2_has_first_result = 0U;
+static TaskSpo2HeartFilter_t s_spo2_hr_filter;
 #endif
 #if 0
 static Spo2State_t s_spo2_display_state;
@@ -79,7 +94,6 @@ static TaskSpo2Candidate_t s_hr_candidate;
 #endif
 static TaskSpo2WearWindow_t s_spo2_wear_window;
 static TaskSpo2WearState_t s_spo2_wear_state = TASK_SPO2_WEAR_UNCALIBRATED;
-static uint8_t s_spo2_wear_window_ready = 0U;
 #if (TASK_SPO2_WEAR_THRESHOLDS_CONFIGURED != 0U)
 static uint8_t s_spo2_wear_confirm_count = 0U;
 static uint8_t s_spo2_wear_release_count = 0U;
@@ -168,7 +182,6 @@ static void Task_Spo2WearEvaluateWindow(void)
     (void)red_dc;
     (void)red_ac;
 #endif
-    s_spo2_wear_window_ready = 1U;
     Task_Spo2WearResetWindow();
 }
 
@@ -211,9 +224,9 @@ static void Task_Spo2ResetBuffer(void)
     s_spo2_sample_count = 0U;
     s_spo2_samples_since_calc = 0U;
     s_spo2_has_first_result = 0U;
+    memset(&s_spo2_hr_filter, 0, sizeof(s_spo2_hr_filter));
 #endif
     s_spo2_wear_state = TASK_SPO2_WEAR_UNCALIBRATED;
-    s_spo2_wear_window_ready = 0U;
 #if (TASK_SPO2_WEAR_THRESHOLDS_CONFIGURED != 0U)
     s_spo2_wear_confirm_count = 0U;
     s_spo2_wear_release_count = 0U;
@@ -310,6 +323,101 @@ static uint16_t Task_Spo2EstimatePerfusion(void)
     }
 
     return (uint16_t)perfusion;
+}
+
+static uint16_t Task_Spo2HeartDiff(uint16_t a, uint16_t b)
+{
+    return (a > b) ? (uint16_t)(a - b) : (uint16_t)(b - a);
+}
+
+static uint8_t Task_Spo2FilterHeartRate(int32_t heart_rate,
+                                               int8_t hr_valid,
+                                               uint16_t *filtered)
+{
+    uint16_t value;
+    uint16_t diff;
+
+    if (filtered == NULL)
+    {
+        return 0U;
+    }
+    *filtered = 0U;
+
+    if ((hr_valid != 1) ||
+        (heart_rate < (int32_t)TASK_SPO2_HR_MIN_BPM) ||
+        (heart_rate > (int32_t)TASK_SPO2_HR_MAX_BPM))
+    {
+        s_spo2_hr_filter.candidate_count = 0U;
+        if (s_spo2_hr_filter.output_valid != 0U)
+        {
+            s_spo2_hr_filter.stale_count++;
+            if (s_spo2_hr_filter.stale_count >= TASK_SPO2_HR_STALE_COUNT)
+            {
+                s_spo2_hr_filter.output_valid = 0U;
+                s_spo2_hr_filter.stale_count = 0U;
+            }
+        }
+        if (s_spo2_hr_filter.output_valid != 0U)
+        {
+            *filtered = s_spo2_hr_filter.output;
+        }
+        return s_spo2_hr_filter.output_valid;
+    }
+
+    value = (uint16_t)heart_rate;
+    if (s_spo2_hr_filter.output_valid != 0U)
+    {
+        diff = Task_Spo2HeartDiff(value, s_spo2_hr_filter.output);
+        if (diff <= TASK_SPO2_HR_STABLE_DELTA)
+        {
+            /* 已锁定后使用轻量低通，抑制每秒结果的小幅跳动。 */
+            s_spo2_hr_filter.output = (uint16_t)
+                ((((uint32_t)s_spo2_hr_filter.output * 3U) + value + 2U) / 4U);
+            s_spo2_hr_filter.candidate_count = 0U;
+            s_spo2_hr_filter.stale_count = 0U;
+            *filtered = s_spo2_hr_filter.output;
+            return 1U;
+        }
+    }
+
+    diff = Task_Spo2HeartDiff(value, s_spo2_hr_filter.candidate);
+    if ((s_spo2_hr_filter.candidate_count == 0U) ||
+        (diff > TASK_SPO2_HR_STABLE_DELTA))
+    {
+        s_spo2_hr_filter.candidate = value;
+        s_spo2_hr_filter.candidate_count = 1U;
+    }
+    else
+    {
+        s_spo2_hr_filter.candidate = (uint16_t)
+            ((((uint32_t)s_spo2_hr_filter.candidate *
+               s_spo2_hr_filter.candidate_count) + value) /
+             (s_spo2_hr_filter.candidate_count + 1U));
+        s_spo2_hr_filter.candidate_count++;
+    }
+
+    if (s_spo2_hr_filter.candidate_count >= TASK_SPO2_HR_CONFIRM_COUNT)
+    {
+        s_spo2_hr_filter.output = s_spo2_hr_filter.candidate;
+        s_spo2_hr_filter.output_valid = 1U;
+        s_spo2_hr_filter.candidate_count = 0U;
+        s_spo2_hr_filter.stale_count = 0U;
+    }
+    else if (s_spo2_hr_filter.output_valid != 0U)
+    {
+        s_spo2_hr_filter.stale_count++;
+        if (s_spo2_hr_filter.stale_count >= TASK_SPO2_HR_STALE_COUNT)
+        {
+            s_spo2_hr_filter.output_valid = 0U;
+            s_spo2_hr_filter.stale_count = 0U;
+        }
+    }
+
+    if (s_spo2_hr_filter.output_valid != 0U)
+    {
+        *filtered = s_spo2_hr_filter.output;
+    }
+    return s_spo2_hr_filter.output_valid;
 }
 #endif
 
@@ -466,7 +574,15 @@ static int32_t Task_Spo2FillGeneratedOutput(Spo2State_t *sample)
 
     if (Task_Spo2GeneratedOutputAllowed() == 0U)
     {
-        s_spo2_generated_initialized = 0U;
+        /* 摘下后只发布一次无效数据，清除界面上残留的旧读数。 */
+        if (s_spo2_generated_initialized != 0U)
+        {
+            s_spo2_generated_initialized = 0U;
+            s_spo2_generated_hr = 0U;
+            s_spo2_generated_value = 0U;
+            App_DebugLog("G,0,0");
+            return 1;
+        }
         return 0;
     }
 
@@ -508,6 +624,8 @@ static void Task_Spo2FillRawOutput(Spo2State_t *sample,
                                     int32_t heart_rate,
                                     int8_t hr_valid)
 {
+    uint16_t filtered_hr = 0U;
+
     memset(sample, 0, sizeof(*sample));
 
     if ((s_spo2_wear_state == TASK_SPO2_WEAR_WORN) &&
@@ -517,11 +635,17 @@ static void Task_Spo2FillRawOutput(Spo2State_t *sample,
         sample->spo2_valid = 1U;
     }
 
-    if ((s_spo2_wear_state == TASK_SPO2_WEAR_WORN) &&
-        (hr_valid == 1) && (heart_rate >= 0) && (heart_rate <= 65535))
+    if (s_spo2_wear_state == TASK_SPO2_WEAR_WORN)
     {
-        sample->heart_rate_bpm = (uint16_t)heart_rate;
-        sample->heart_rate_valid = 1U;
+        if (Task_Spo2FilterHeartRate(heart_rate, hr_valid, &filtered_hr) != 0U)
+        {
+            sample->heart_rate_bpm = filtered_hr;
+            sample->heart_rate_valid = 1U;
+        }
+    }
+    else
+    {
+        memset(&s_spo2_hr_filter, 0, sizeof(s_spo2_hr_filter));
     }
 
     sample->perfusion_permille = Task_Spo2EstimatePerfusion();
@@ -583,10 +707,6 @@ int32_t App_Spo2ReadSample(Spo2State_t *sample)
 
 #if (TASK_SPO2_GENERATED_OUTPUT_ENABLE != 0U)
     /* 生成心率/血氧由任务主循环定时发布，这里只负责采集反射值窗口。 */
-    if (s_spo2_wear_window_ready != 0U)
-    {
-        s_spo2_wear_window_ready = 0U;
-    }
     return 0;
 #else
     if (s_spo2_sample_count < MAX30102_ALGO_BUFFER_SIZE)
@@ -616,8 +736,11 @@ int32_t App_Spo2ReadSample(Spo2State_t *sample)
                  (int)hr_valid,
                  (long)spo2,
                  (int)spo2_valid);
-    /* 暂时直接发布算法原始结果，排除显示后处理对数据链路的影响。 */
+    /* 原始算法结果经过范围和连续性确认后再发布到全局状态。 */
     Task_Spo2FillRawOutput(sample, spo2, spo2_valid, heart_rate, hr_valid);
+    App_DebugLog("H,%u,%u",
+                 (unsigned int)sample->heart_rate_bpm,
+                 (unsigned int)sample->heart_rate_valid);
     return 1;
 #endif
 }
@@ -628,19 +751,25 @@ int32_t Task_Spo2InitHardware(void)
     /* 模拟显示模式不访问 MAX30102，关闭开关后恢复真实硬件初始化。 */
     return 0;
 #else
+    int32_t init_result;
+
     /* 初始化阶段也走 I2C 互斥锁，保持和运行态访问规则一致。 */
     if (osMutexAcquire(g_i2cBusMutex, osWaitForever) != osOK)
     {
+        App_DebugLog("S,I,M");
         return -1;
     }
 
-    if (App_Spo2HardwareInit() != 0)
+    init_result = App_Spo2HardwareInit();
+    if (init_result != 0)
     {
         osMutexRelease(g_i2cBusMutex);
+        App_DebugLog("S,I,%ld", (long)init_result);
         return -2;
     }
 
     osMutexRelease(g_i2cBusMutex);
+    App_DebugLog("S,I,0");
     return 0;
 #endif
 }
@@ -688,6 +817,7 @@ void Task_Spo2Entry(void *argument)
 #else
     Spo2State_t spo2;
     uint32_t next_tick;
+    int32_t last_read_error;
 #if (TASK_SPO2_GENERATED_OUTPUT_ENABLE != 0U)
     uint32_t next_output_tick;
 #endif
@@ -700,6 +830,7 @@ void Task_Spo2Entry(void *argument)
                      osFlagsWaitAny | osFlagsNoClear,
                      osWaitForever);
     next_tick = osKernelGetTickCount();
+    last_read_error = 0;
 #if (TASK_SPO2_GENERATED_OUTPUT_ENABLE != 0U)
     next_output_tick = next_tick;
 #endif
@@ -721,6 +852,21 @@ void Task_Spo2Entry(void *argument)
         else
         {
             result = -1;
+        }
+
+        /* 只在错误类型变化或通信恢复时输出，避免故障时刷满日志队列。 */
+        if (result < 0)
+        {
+            if (result != last_read_error)
+            {
+                App_DebugLog("S,E,%ld", (long)result);
+                last_read_error = result;
+            }
+        }
+        else if (last_read_error != 0)
+        {
+            App_DebugLog("S,R");
+            last_read_error = 0;
         }
 
 #if (TASK_SPO2_GENERATED_OUTPUT_ENABLE != 0U)

@@ -47,8 +47,8 @@ extern "C" {
 #define APP_SPO2_PERIOD_MS          100U        /* 血氧 FIFO 读取周期 (10Hz)，避免 100Hz 采样溢出 */
 
 /* 佩戴反射光强阈值：0 表示尚未标定，此时只输出串口测试数据，不确认佩戴。 */
-#define APP_SPO2_WEAR_IR_DC_MIN     0U
-#define APP_SPO2_WEAR_RED_DC_MIN    0U
+#define APP_SPO2_WEAR_IR_DC_MIN     50000U
+#define APP_SPO2_WEAR_RED_DC_MIN    30000U
 
 #define APP_LORA_PERIOD_MS          1000U       /* LoRa 导航位置发送/收发轮询周期 (1Hz) */
 #define APP_RETURN_PERIOD_MS        100U        /* 返航控制周期 (10Hz) */

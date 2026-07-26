@@ -250,7 +250,7 @@ static int32_t App_StartRuntimeTasks(void)
     const osThreadAttr_t spo2TaskAttr = {
         .name = "Spo2Task",
         .priority = osPriorityLow,
-        .stack_size = 512U
+        .stack_size = 1024U
     };
     const osThreadAttr_t adcTaskAttr = {
         .name = "AdcTask",

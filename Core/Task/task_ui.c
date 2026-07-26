@@ -106,8 +106,6 @@
 #define UI_RETURN_TEXT_H      48U
 #define UI_RETURN_FRAME_NONE  0xFFU
 #define UI_RETURN_TURN_UNSET  2
-#define UI_RETURN_LOCAL_DEMO_DISTANCE_M 10.0f
-#define UI_RETURN_LOCAL_DEMO_ARRIVE_M   1.0f
 
 /* 临时 UI 卡顿定位开关，定位完成后可改为 0U。 */
 #ifndef UI_DIAG_ENABLE
@@ -177,7 +175,6 @@
 #define UI_MAIN_RETURN_Y           183U
 #define UI_MAIN_RETURN_W           240U
 #define UI_MAIN_RETURN_H           124U
-#define UI_MAIN_RETURN_SPLIT_X     (UI_MAIN_RETURN_X + (UI_MAIN_RETURN_W / 2U))
 
 #define UI_QUICK_BTN_X             28U
 #define UI_QUICK_BTN_W             232U
@@ -267,11 +264,6 @@ static uint8_t s_lastStatusDataValid[4];
 static uint8_t s_lastReturnFrame = UI_RETURN_FRAME_NONE;
 static uint32_t s_lastReturnDistanceM = 0xFFFFFFFFU;
 static int8_t s_lastReturnTurn = UI_RETURN_TURN_UNSET;
-static uint8_t s_returnLocalDemoActive = 0U;
-static uint8_t s_returnLocalDemoArrived = 0U;
-static float s_returnLocalDemoTargetX = 0.0f;
-static float s_returnLocalDemoTargetY = 0.0f;
-static float s_returnLocalDemoLastHeadingRad = 0.0f;
 static uint16_t s_returnIconBuffer[COMPASS_ICON_BBOX_MAX_W * COMPASS_ICON_BBOX_MAX_H];
 static uint16_t s_dashboardDecodeBuffer[UI_DASHBOARD_CHUNK_PIXELS];
 static uint8_t s_mainBackgroundValid = 0U;
@@ -515,18 +507,18 @@ static float Ui_CdegToRad(int16_t cdeg)
     return ((float)cdeg * UI_PI) / 18000.0f;
 }
 #if (UI_RETURN_ENABLE_HAND_RAISED_FLIP != 0U)
-static uint8_t Ui_IsHandRaisedForIns(const AppSnapshot_t *snapshot)
+static uint8_t Ui_IsHandRaisedForIns(const NavState_t *nav)
 {
     float roll_abs_deg;
     float pitch_abs_deg;
 
-    if ((snapshot == NULL) || (snapshot->nav.update_count == 0U))
+    if ((nav == NULL) || (nav->update_count == 0U))
     {
         return 0U;
     }
 
-    roll_abs_deg = fabsf(snapshot->nav.data.attitude_rad[0] * UI_RAD_TO_DEG);
-    pitch_abs_deg = fabsf(snapshot->nav.data.attitude_rad[1] * UI_RAD_TO_DEG);
+    roll_abs_deg = fabsf(nav->data.attitude_rad[0] * UI_RAD_TO_DEG);
+    pitch_abs_deg = fabsf(nav->data.attitude_rad[1] * UI_RAD_TO_DEG);
 
     /* 实测抬手稳定段 Roll 接近 +/-90 度，Pitch 仍接近 0 度。 */
     return ((fabsf(roll_abs_deg - UI_HAND_RAISED_ROLL_TARGET_DEG) <= UI_HAND_RAISED_ROLL_TOL_DEG) &&
@@ -611,87 +603,7 @@ static void Ui_DrawCompassIconFrame(uint8_t frame)
                                   icon->bbox_h,
                                   s_returnIconBuffer);
 }
-static void Ui_StartLocalReturnDemo(void)
-{
-    NavState_t nav;
-    float yaw_rad;
-
-    memset(&nav, 0, sizeof(nav));
-    App_StateGetNav(&nav);
-
-    yaw_rad = nav.data.YAW_deg * UI_PI / 180.0f;
-    s_returnLocalDemoTargetX =
-        nav.data.position_m[0] + (UI_RETURN_LOCAL_DEMO_DISTANCE_M * sinf(yaw_rad));
-    s_returnLocalDemoTargetY =
-        nav.data.position_m[1] + (UI_RETURN_LOCAL_DEMO_DISTANCE_M * cosf(yaw_rad));
-    s_returnLocalDemoLastHeadingRad = 0.0f;
-    s_returnLocalDemoArrived = 0U;
-    s_returnLocalDemoActive = 1U;
-}
-
-static void Ui_StopLocalReturnDemo(void)
-{
-    s_returnLocalDemoActive = 0U;
-    s_returnLocalDemoArrived = 0U;
-    s_returnLocalDemoTargetX = 0.0f;
-    s_returnLocalDemoTargetY = 0.0f;
-    s_returnLocalDemoLastHeadingRad = 0.0f;
-}
-
-static int32_t Ui_GetLocalReturnGuidance(const AppSnapshot_t *snapshot,
-                                        UiReturnGuidance_t *guidance)
-{
-    float delta_x;
-    float delta_y;
-    float distance_m;
-    float target_bearing_rad;
-    float yaw_rad;
-
-    if ((snapshot == NULL) || (guidance == NULL))
-    {
-        return -1;
-    }
-
-    delta_x = s_returnLocalDemoTargetX - snapshot->nav.data.position_m[0];
-    delta_y = s_returnLocalDemoTargetY - snapshot->nav.data.position_m[1];
-    distance_m = sqrtf((delta_x * delta_x) + (delta_y * delta_y));
-
-    if (s_returnLocalDemoArrived == 0U)
-    {
-        if (distance_m <= UI_RETURN_LOCAL_DEMO_ARRIVE_M)
-        {
-            s_returnLocalDemoArrived = 1U;
-            distance_m = 0.0f;
-        }
-        else
-        {
-            target_bearing_rad = atan2f(delta_x, delta_y);
-            yaw_rad = snapshot->nav.data.YAW_deg * UI_PI / 180.0f;
-            s_returnLocalDemoLastHeadingRad = target_bearing_rad - yaw_rad;
-        }
-    }
-    else
-    {
-        distance_m = 0.0f;
-    }
-
-    guidance->valid = 1U;
-    guidance->heading_rad = s_returnLocalDemoLastHeadingRad;
-#if (UI_RETURN_ENABLE_HAND_RAISED_FLIP != 0U)
-    if (Ui_IsHandRaisedForIns(snapshot) != 0U)
-    {
-        guidance->heading_rad += UI_PI;
-    }
-#endif
-    guidance->distance_m = Ui_FloatToU32(distance_m);
-    guidance->turn_after_next = 0;
-    return 0;
-}
-
-/*
- * 左半区使用本地10m目标；右半区读取 ControlTask 每500ms更新的真实引导。
- * 两种模式在这里统一转换成 UI 显示单位。
- */
+/* 将 ControlTask 每500ms更新的真实返航引导转换成 UI 显示单位。 */
 __weak int32_t App_UiGetReturnGuidance(const AppSnapshot_t *snapshot, UiReturnGuidance_t *guidance)
 {
     const ReturnGuideState_t *guide;
@@ -699,11 +611,6 @@ __weak int32_t App_UiGetReturnGuidance(const AppSnapshot_t *snapshot, UiReturnGu
     if ((snapshot == NULL) || (guidance == NULL))
     {
         return -1;
-    }
-
-    if (s_returnLocalDemoActive != 0U)
-    {
-        return Ui_GetLocalReturnGuidance(snapshot, guidance);
     }
 
     guide = &snapshot->return_guide;
@@ -714,7 +621,7 @@ __weak int32_t App_UiGetReturnGuidance(const AppSnapshot_t *snapshot, UiReturnGu
         guidance->valid = 1U;
         guidance->heading_rad = Ui_CdegToRad(guide->relative_bearing_cdeg);
 #if (UI_RETURN_ENABLE_HAND_RAISED_FLIP != 0U)
-        if (Ui_IsHandRaisedForIns(snapshot) != 0U)
+        if (Ui_IsHandRaisedForIns(&snapshot->nav) != 0U)
         {
             /* 抬手时设备+x变为行人正方向，返航UI箭头需要反向显示。 */
             guidance->heading_rad += UI_PI;
@@ -2006,16 +1913,6 @@ static UiTouchAction_t Ui_HandleTouch(uint16_t x, uint16_t y, AppCommandMsg_t *c
         }
         if (Ui_PointInRect(x, y, UI_MAIN_RETURN_X, UI_MAIN_RETURN_Y, UI_MAIN_RETURN_W, UI_MAIN_RETURN_H) != 0U)
         {
-            if (x < UI_MAIN_RETURN_SPLIT_X)
-            {
-                /* 左半区建立入口航向前方10m的本地演示目标。 */
-                Ui_StartLocalReturnDemo();
-            }
-            else
-            {
-                Ui_StopLocalReturnDemo();
-            }
-
             s_view = UI_VIEW_RETURN;
             command->id = APP_CMD_RETURN_HOME_START;
             return UI_TOUCH_RETURN_START;
@@ -2048,7 +1945,6 @@ static UiTouchAction_t Ui_HandleTouch(uint16_t x, uint16_t y, AppCommandMsg_t *c
     else
     {
         s_view = UI_VIEW_MAIN;
-        Ui_StopLocalReturnDemo();
         command->id = APP_CMD_RETURN_HOME_STOP;
         return UI_TOUCH_RETURN_STOP;
     }
