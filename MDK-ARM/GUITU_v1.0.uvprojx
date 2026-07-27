@@ -1511,6 +1511,16 @@
               <FilePath>..\Core\PeripheralDriver\e22_lora_tx.h</FilePath>
             </File>
             <File>
+              <FileName>nrf24l01.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\PeripheralDriver\nrf24l01.c</FilePath>
+            </File>
+            <File>
+              <FileName>nrf24l01.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Core\PeripheralDriver\nrf24l01.h</FilePath>
+            </File>
+            <File>
               <FileName>gtm1000_tag.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Core\PeripheralDriver\gtm1000_tag.c</FilePath>

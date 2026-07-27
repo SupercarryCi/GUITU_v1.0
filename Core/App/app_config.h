@@ -17,6 +17,7 @@ extern "C" {
 #define APP_DISPLAY_SPI_HANDLE      hspi1       /* 显示屏 SPI 接口 */
 #define APP_TOUCH_SPI_HANDLE        hspi2       /* 触摸面板 SPI 接口 */
 #define APP_LORA_SPI_HANDLE         hspi4       /* LoRa 射频模块 SPI 接口 */
+#define APP_NRF24_SPI_HANDLE        hspi4       /* NRF24L01 与 LoRa 共用 SPI4 */
 
 #define APP_SPO2_I2C_HANDLE         hi2c1       /* 血氧传感器 I2C 接口 */
 
@@ -35,7 +36,8 @@ extern "C" {
 #define APP_LORA_MAX_PAYLOAD_LEN    128U        /* LoRa 单包最大负载字节数 */
 #define APP_DEBUG_LOG_TEXT_LEN      32U         /* 单条调试日志最大文本长度 */
 
-#define APP_ADC_CHANNEL_COUNT       2U          /* ADC 采集通道数量 */
+#define APP_ADC_CHANNEL_COUNT       2U          /* 全局状态保留两路 ADC 数据位置 */
+#define APP_ADC_ACTIVE_CHANNEL_COUNT 1U          /* ADC.2/PC4 改作 NRF24 CE，仅采集 ADC.1 */
 #define APP_ADC_SAMPLE_PERIOD_MS    100U        /* ADC 采样周期 (ms) */
 #define APP_ADC_STARTUP_DELAY_MS    10000U      /* 系统初始化完成后等待传感器稳定 */
 #define APP_ADC_SAMPLE_TIMEOUT_MS   20U         /* 单次 ADC 采样超时时间 (ms) */
@@ -43,7 +45,7 @@ extern "C" {
 #define APP_ADC_FULL_SCALE          65535U      /* ADC 满量程值 (16bit) */
 
 #define APP_UI_PERIOD_MS            500U        /* UI 显示刷新周期 (2Hz) */
-#define APP_UI_TOUCH_PERIOD_MS      100U        /* 触摸轮询周期 (10Hz) */
+#define APP_UI_TOUCH_PERIOD_MS      50U         /* 触摸轮询周期 (20Hz) */
 #define APP_SPO2_PERIOD_MS          100U        /* 血氧 FIFO 读取周期 (10Hz)，避免 100Hz 采样溢出 */
 
 /* 佩戴反射光强阈值：0 表示尚未标定，此时只输出串口测试数据，不确认佩戴。 */
@@ -51,6 +53,7 @@ extern "C" {
 #define APP_SPO2_WEAR_RED_DC_MIN    30000U
 
 #define APP_LORA_PERIOD_MS          1000U       /* LoRa 导航位置发送/收发轮询周期 (1Hz) */
+#define APP_NRF24_POLL_PERIOD_MS    50U         /* 未连接 IRQ，任务轮询 NRF24 接收 FIFO */
 #define APP_RETURN_PERIOD_MS        100U        /* 返航控制周期 (10Hz) */
 
 /* 气体报警阈值，传感器标定后只需要调整这里。 */
@@ -64,6 +67,7 @@ extern "C" {
 
 /* LoRa 当前只预留框架，默认不启用真实收发任务。 */
 #define APP_LORA_ENABLE_DEFAULT     1U
+#define APP_NRF24_ENABLE_DEFAULT    1U
 
 #define APP_INIT_GYRO_DMA           (1UL << 0)  /* 陀螺仪 DMA 接收启动完成 */
 #define APP_INIT_UI                 (1UL << 1)  /* UI 硬件初始化完成 */

@@ -82,6 +82,10 @@ void Error_Handler(void);
 #define E22_DIO1_EXTI_IRQn EXTI15_10_IRQn
 #define E22_NSS_Pin GPIO_PIN_11
 #define E22_NSS_GPIO_Port GPIOE
+#define NRF24_CE_Pin GPIO_PIN_4
+#define NRF24_CE_GPIO_Port GPIOC
+#define NRF24_CSN_Pin GPIO_PIN_9
+#define NRF24_CSN_GPIO_Port GPIOD
 #define SOS_Pin GPIO_PIN_12
 #define SOS_GPIO_Port GPIOB
 

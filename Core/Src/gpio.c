@@ -52,8 +52,16 @@ void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOE, LED_Pin|D_C_Pin|RESET_t_Pin|BUZZER_Pin
-                          |E22_NSS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOE, LED_Pin|D_C_Pin|RESET_t_Pin|BUZZER_Pin, GPIO_PIN_RESET);
+
+  /* SPI4 devices must remain deselected until their drivers start. */
+  HAL_GPIO_WritePin(E22_NSS_GPIO_Port, E22_NSS_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(NRF24_CSN_GPIO_Port, NRF24_CSN_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(NRF24_CE_GPIO_Port, NRF24_CE_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET);
@@ -72,6 +80,20 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : NRF24_CSN_Pin */
+  GPIO_InitStruct.Pin = NRF24_CSN_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(NRF24_CSN_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : NRF24_CE_Pin */
+  GPIO_InitStruct.Pin = NRF24_CE_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(NRF24_CE_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : IRQ_Pin E22_BUSY_Pin */
   GPIO_InitStruct.Pin = IRQ_Pin|E22_BUSY_Pin;

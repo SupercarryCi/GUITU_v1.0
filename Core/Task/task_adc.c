@@ -4,7 +4,7 @@
  *
  * 本文件实现 ADC 周期性采样任务 (AdcTask).
  * 采用 "单次 DMA 传输 + 信号量同步" 模型:
- *   1. 任务周期启动 ADC1 DMA 采样(双通道顺序转换).
+ *   1. 任务周期启动 ADC1 DMA 采样(当前启用单通道).
  *   2. DMA 传输完成后触发 HAL_ADC_ConvCpltCallback, 释放信号量通知任务.
  *   3. 任务获取信号量后, 将原始值换算为电压(mV), 并通过 App_StateSetAdc()
  *      更新到全局状态结构中, 同时设置系统事件标志 SYS_EVT_ADC_UPDATED.
@@ -32,7 +32,7 @@
 
 //static uint32_t s_adcTxCnt = 0U; /*测试变量*/
 
-static uint16_t s_adcDmaBuffer[APP_ADC_CHANNEL_COUNT] __attribute__((section(".dma_buffer"), aligned(32))); /* DMA 缓冲区 */
+static uint16_t s_adcDmaBuffer[APP_ADC_ACTIVE_CHANNEL_COUNT] __attribute__((section(".dma_buffer"), aligned(32))); /* DMA 缓冲区 */
 static volatile uint32_t s_adcDmaErrorCount = 0U;
 
 #define ADC_GAS_PPM_MAX 99999.0f
@@ -44,13 +44,13 @@ static uint8_t Task_AdcIsGasAlarmActive(const AdcState_t *adc)
         return 0U;
     }
 
-    if ((APP_ADC_CHANNEL_COUNT > 0U) &&
+    if ((APP_ADC_ACTIVE_CHANNEL_COUNT > 0U) &&
         (adc->gas_concentration[0] >= APP_GAS_NGAS_ALARM_THRESHOLD_PPM))
     {
         return 1U;
     }
 
-    if ((APP_ADC_CHANNEL_COUNT > 1U) &&
+    if ((APP_ADC_ACTIVE_CHANNEL_COUNT > 1U) &&
         (adc->gas_concentration[1] >= APP_GAS_LPG_ALARM_THRESHOLD_PPM))
     {
         return 1U;
@@ -139,7 +139,7 @@ void Task_AdcEntry(void *argument)
 
         start_status = HAL_ADC_Start_DMA(&APP_ADC_HANDLE,
                                          (uint32_t *)s_adcDmaBuffer,
-                                         APP_ADC_CHANNEL_COUNT);
+                                         APP_ADC_ACTIVE_CHANNEL_COUNT);
         if (start_status == HAL_OK)
         {
             /* 等待 DMA 传输完成信号量, 超时时间 APP_ADC_SAMPLE_TIMEOUT_MS */
@@ -148,7 +148,7 @@ void Task_AdcEntry(void *argument)
                 uint32_t i;
                 uint8_t gas_alarm_active;
 
-                for (i = 0U; i < APP_ADC_CHANNEL_COUNT; i++)
+                for (i = 0U; i < APP_ADC_ACTIVE_CHANNEL_COUNT; i++)
                 {
                     adc.raw[i] = s_adcDmaBuffer[i];
                     adc.voltage_mv[i] = (uint16_t)(((uint32_t)s_adcDmaBuffer[i] * APP_ADC_VREF_MV) /

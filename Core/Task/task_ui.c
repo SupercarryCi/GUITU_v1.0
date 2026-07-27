@@ -1467,8 +1467,14 @@ static void Ui_DrawMainView(const AppSnapshot_t *snapshot, uint8_t full_redraw)
 
     Ui_UpdateTopSignal(snapshot, force_update);
     Ui_UpdateMainBaseInfo(snapshot, force_update);
-    Ui_UpdateMainStatusCard(0U, value[0], adc_data_valid, force_update);
-    Ui_UpdateMainStatusCard(1U, value[1], adc_data_valid, force_update);
+    Ui_UpdateMainStatusCard(0U,
+                            value[0],
+                            ((APP_ADC_ACTIVE_CHANNEL_COUNT > 0U) ? adc_data_valid : 0U),
+                            force_update);
+    Ui_UpdateMainStatusCard(1U,
+                            value[1],
+                            ((APP_ADC_ACTIVE_CHANNEL_COUNT > 1U) ? adc_data_valid : 0U),
+                            force_update);
     Ui_UpdateMainStatusCard(2U, value[2], snapshot->spo2.heart_rate_valid, force_update);
     Ui_UpdateMainStatusCard(3U, value[3], snapshot->spo2.spo2_valid, force_update);
     s_mainValueValid = 1U;
@@ -2091,6 +2097,7 @@ void Task_UiEntry(void *argument)
     uint32_t touch_wait_ms;
     uint32_t touch_ms;
     uint32_t now;
+    uint8_t force_display_refresh;
 
     (void)argument;
     memset(&ui, 0, sizeof(ui));
@@ -2139,8 +2146,11 @@ void Task_UiEntry(void *argument)
         }
         Ui_DiagLog("U%lu T-%lu", (unsigned long)loop_count, (unsigned long)touch_ms);
 
+        force_display_refresh = ((s_lastRenderedView != s_view) ||
+                                 (s_loraPopupNeedRedraw != 0U)) ? 1U : 0U;
         now = osKernelGetTickCount();
-        if ((int32_t)(now - next_display_tick) >= 0)
+        if ((force_display_refresh != 0U) ||
+            ((int32_t)(now - next_display_tick) >= 0))
         {
             memset(&snapshot, 0, sizeof(snapshot));
             Ui_DiagLog("U%lu S+", (unsigned long)loop_count);
@@ -2163,12 +2173,20 @@ void Task_UiEntry(void *argument)
                 ui.render_count++;
             }
 
-            next_display_tick += APP_UI_PERIOD_MS;
             now = osKernelGetTickCount();
-            if ((int32_t)(now - next_display_tick) >= 0)
+            if (force_display_refresh != 0U)
             {
-                /* 显示超时时跳过已错过的周期，避免连续追帧占用任务。 */
+                /* 立即刷新后重新开始显示周期，避免紧接着重复绘制。 */
                 next_display_tick = now + APP_UI_PERIOD_MS;
+            }
+            else
+            {
+                next_display_tick += APP_UI_PERIOD_MS;
+                if ((int32_t)(now - next_display_tick) >= 0)
+                {
+                    /* 显示超时时跳过已错过的周期，避免连续追帧占用任务。 */
+                    next_display_tick = now + APP_UI_PERIOD_MS;
+                }
             }
         }
 

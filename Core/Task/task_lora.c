@@ -12,6 +12,7 @@
 #include "e22_lora_stm32_hal_port.h"
 #include "e22_lora_tx.h"
 #include "gpio.h"
+#include "nrf24l01.h"
 #include "spi.h"
 #include <stdio.h>
 #include <string.h>
@@ -24,6 +25,31 @@
 
 static LoraPacketMsg_t s_pending_tx_packet;
 static uint8_t s_pending_tx_valid;
+static uint8_t s_pending_nrf_attempted;
+static uint8_t s_nrf_ready;
+
+static int32_t task_nrf24_init(void)
+{
+#if (APP_NRF24_ENABLE_DEFAULT != 0U)
+    Nrf24l01Config_t config;
+    int32_t result;
+
+    Nrf24l01_GetDefaultConfig(&config);
+    config.hspi = &APP_NRF24_SPI_HANDLE;
+    config.ce_port = NRF24_CE_GPIO_Port;
+    config.ce_pin = NRF24_CE_Pin;
+    config.csn_port = NRF24_CSN_GPIO_Port;
+    config.csn_pin = NRF24_CSN_Pin;
+
+    result = Nrf24l01_Init(&config);
+    s_nrf_ready = (result == NRF24L01_OK) ? 1U : 0U;
+    App_DebugLog("N,I,%ld", (long)result);
+    return result;
+#else
+    s_nrf_ready = 0U;
+    return 0;
+#endif
+}
 
 int32_t App_LoraHardwareInit(void)
 {
@@ -31,6 +57,9 @@ int32_t App_LoraHardwareInit(void)
     e22_lora_tx_config_t lora_cfg;
 
     memset(&port_cfg, 0, sizeof(port_cfg));
+    /* NRF24初始化失败时保留LoRa后备链路，不阻塞系统启动。 */
+    (void)task_nrf24_init();
+
     port_cfg.hspi = &APP_LORA_SPI_HANDLE;
     port_cfg.nss.port = E22_NSS_GPIO_Port;
     port_cfg.nss.pin = E22_NSS_Pin;
@@ -110,6 +139,39 @@ int32_t Lora_SendBytes(const uint8_t *data, uint16_t len)
     }
 
     return 0;
+}
+
+static int32_t task_nrf24_send_packet(const LoraPacketMsg_t *packet)
+{
+#if (APP_NRF24_ENABLE_DEFAULT != 0U)
+    int32_t result = NRF24L01_ERROR_ARGUMENT;
+    uint8_t retry_count;
+
+    if ((packet == 0) ||
+        (packet->len == 0U) ||
+        (packet->len > NRF24L01_MAX_PAYLOAD_LEN) ||
+        (s_nrf_ready == 0U))
+    {
+        return NRF24L01_ERROR_ARGUMENT;
+    }
+
+    if (osMutexAcquire(g_spiLoraMutex, osWaitForever) == osOK)
+    {
+        result = Nrf24l01_Send(packet->payload,
+                              (uint8_t)packet->len,
+                              &retry_count);
+        osMutexRelease(g_spiLoraMutex);
+    }
+    else
+    {
+        result = NRF24L01_ERROR_SPI;
+    }
+
+    return result;
+#else
+    (void)packet;
+    return NRF24L01_ERROR_ARGUMENT;
+#endif
 }
 
 static int32_t task_lora_float_to_milli(float value)
@@ -273,6 +335,51 @@ static void task_lora_poll_receive(LoraState_t *lora, LoraPacketMsg_t *packet)
     }
 }
 
+static void task_nrf24_poll_receive(LoraState_t *lora, LoraPacketMsg_t *packet)
+{
+#if (APP_NRF24_ENABLE_DEFAULT != 0U)
+    uint8_t length;
+    int32_t result = 0;
+
+    if ((lora == 0) || (packet == 0) || (s_nrf_ready == 0U))
+    {
+        return;
+    }
+
+    memset(packet, 0, sizeof(*packet));
+    if (osMutexAcquire(g_spiLoraMutex, osWaitForever) == osOK)
+    {
+        result = Nrf24l01_PollReceive(packet->payload,
+                                     NRF24L01_MAX_PAYLOAD_LEN,
+                                     &length);
+        osMutexRelease(g_spiLoraMutex);
+    }
+
+    if (result > 0)
+    {
+        packet->len = length;
+        packet->rssi_valid = 0U; /* NRF24没有可直接读取的RSSI数值。 */
+        lora->rx_count++;
+        lora->last_rx = *packet;
+        if (osMessageQueuePut(g_loraRxQueue, packet, 0U, 0U) == osOK)
+        {
+            (void)osEventFlagsSet(g_sysEventFlags, SYS_EVT_LORA_RX);
+        }
+        else
+        {
+            lora->error_count++;
+        }
+    }
+    else if (result < 0)
+    {
+        lora->error_count++;
+    }
+#else
+    (void)lora;
+    (void)packet;
+#endif
+}
+
 static void task_lora_get_radio_state(LoraState_t *lora,
                                       uint8_t *tx_busy,
                                       uint8_t *rx_active)
@@ -329,6 +436,7 @@ void Task_LoraEntry(void *argument)
     next_nav_tx_tick = 0U;
     memset(&s_pending_tx_packet, 0, sizeof(s_pending_tx_packet));
     s_pending_tx_valid = 0U;
+    s_pending_nrf_attempted = 0U;
 #endif
 
     osEventFlagsWait(g_sysEventFlags,
@@ -345,15 +453,22 @@ void Task_LoraEntry(void *argument)
         int32_t tx_result;
         uint8_t tx_busy;
         uint8_t rx_active;
-        uint8_t radio_started_tx = 0U;
+        uint8_t business_packet_sent = 0U;
 
         now = osKernelGetTickCount();
         wait_timeout = ((int32_t)(next_nav_tx_tick - now) > 0) ?
                        (next_nav_tx_tick - now) : 0U;
+#if (APP_NRF24_ENABLE_DEFAULT != 0U)
+        if ((s_nrf_ready != 0U) &&
+            (wait_timeout > APP_NRF24_POLL_PERIOD_MS))
+        {
+            wait_timeout = APP_NRF24_POLL_PERIOD_MS;
+        }
+#endif
 
         /*
          * 先等待DIO1或导航周期，再统一轮询IRQ。即使EXTI漏触发，
-         * 最长也会在下一个导航周期处理已完成的接收。
+         * 启用NRF24时最长会在下一个NRF24轮询周期处理接收。
          */
         (void)osEventFlagsWait(g_sysEventFlags,
                                SYS_EVT_LORA_DIO1,
@@ -362,6 +477,7 @@ void Task_LoraEntry(void *argument)
 
         /*接收*/
         task_lora_poll_receive(&lora, &packet);
+        task_nrf24_poll_receive(&lora, &packet);
         task_lora_get_radio_state(&lora, &tx_busy, &rx_active);
 
         if (s_pending_tx_valid == 0U)
@@ -372,11 +488,34 @@ void Task_LoraEntry(void *argument)
                                   0U) == osOK)
             {
                 s_pending_tx_valid = 1U;
+                s_pending_nrf_attempted = 0U;
             }
         }
 
-        /*发送*/
+        /*
+         * 每个业务包先通过NRF24发送；收到自动应答即认为链路可用，
+         * 不再占用LoRa。NRF24未应答或包长超限时，再走LoRa后备链路。
+         */
         if ((s_pending_tx_valid != 0U) &&
+            (s_pending_nrf_attempted == 0U) &&
+            (tx_busy == 0U) &&
+            (rx_active == 0U))
+        {
+            tx_result = task_nrf24_send_packet(&s_pending_tx_packet);
+            if (tx_result == NRF24L01_OK)
+            {
+                s_pending_tx_valid = 0U;
+                business_packet_sent = 1U;
+            }
+            else
+            {
+                s_pending_nrf_attempted = 1U;
+            }
+        }
+
+        /* NRF24发送失败后才尝试LoRa。 */
+        if ((s_pending_tx_valid != 0U) &&
+            (s_pending_nrf_attempted != 0U) &&
             (tx_busy == 0U) &&
             (rx_active == 0U))
         {
@@ -384,7 +523,8 @@ void Task_LoraEntry(void *argument)
             if (tx_result == 0)
             {
                 s_pending_tx_valid = 0U;
-                radio_started_tx = 1U;
+                s_pending_nrf_attempted = 0U;
+                business_packet_sent = 1U;
                 tx_busy = 1U;
             }
         }
@@ -396,15 +536,21 @@ void Task_LoraEntry(void *argument)
              * 接收、业务包或上一包发送占用射频时，直接跳过本周期导航包，
              * 不打断当前收包，也不让导航包挤占业务包。
              */
-            if ((rx_active == 0U) &&
+            if ((business_packet_sent == 0U) &&
+                (s_pending_tx_valid == 0U) &&
                 (tx_busy == 0U) &&
-                (radio_started_tx == 0U) &&
-                (s_pending_tx_valid == 0U))
+                (rx_active == 0U))
             {
                 /* 只发送纯数据，坐标单位为mm，yaw单位为0.01度。 */
                 if (task_lora_build_nav_packet(&packet) != 0U)
                 {
-                    (void)task_lora_send_packet(&lora, &packet);
+                    tx_result = task_nrf24_send_packet(&packet);
+                    if ((tx_result != NRF24L01_OK) &&
+                        (rx_active == 0U) &&
+                        (tx_busy == 0U))
+                    {
+                        (void)task_lora_send_packet(&lora, &packet);
+                    }
                 }
             }
 
