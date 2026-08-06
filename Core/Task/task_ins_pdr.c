@@ -17,7 +17,7 @@
 #define INS_PDR_ENABLE_LOGIC 1U                 /* 0: 暂时保留接口，禁用未完成的 INS/PDR 逻辑 */
 #define INS_PDR_ENABLE_INS 0U                   /* 0: 先禁用INS，只输出PDR判步位移 */
 
-#define INS_PDR_ENABLE_HEADING_DIAG 1U          /* 航向诊断日志*/
+#define INS_PDR_ENABLE_HEADING_DIAG 0U          /* 1: 输出临时欧拉角诊断；0: 关闭 */
 #define INS_PDR_HEADING_DIAG_PERIOD_MS 200U     
 #define INS_PDR_DIAG_LINE_LEN 64U
 
@@ -147,6 +147,7 @@ static float task_ins_pdr_snap_heading_deg(float heading_deg)
 #endif
 }
 
+#if (INS_PDR_ENABLE_HEADING_DIAG != 0U)
 static int32_t task_ins_pdr_float_to_centi(float value)
 {
     if (value >= 0.0f)
@@ -157,7 +158,6 @@ static int32_t task_ins_pdr_float_to_centi(float value)
     return (int32_t)((value * 100.0f) - 0.5f);
 }
 
-#if (INS_PDR_ENABLE_HEADING_DIAG != 0U)
 static void task_ins_pdr_diag_uart_log(const char *fmt, ...)
 {
     char line[INS_PDR_DIAG_LINE_LEN];
@@ -238,6 +238,9 @@ void Task_Ins_Pdr_Entry(void *argument)
 {
     GyroState_t gyro;
 #if (INS_PDR_ENABLE_LOGIC != 0U)
+#if (APP_HEADING_SOURCE == APP_HEADING_SOURCE_BEACON_IMU)
+    BeaconHeadingState_t beacon_heading;
+#endif
     PdrStepOutput pdr_out;
     pft_input_t pft_in;
     pft_output_t pft_out;
@@ -314,9 +317,21 @@ void Task_Ins_Pdr_Entry(void *argument)
                 continue;
             }
 
-            /* 当前调试阶段使用WIT原始yaw，并叠加安装偏移作为PDR航向角。 */
+            now_tick = osKernelGetTickCount();
+
+            /* 默认使用二端本机yaw；三端航向有效且未超时时再覆盖。 */
             corrected_heading_deg = task_ins_pdr_normalize_deg(
                 gyro.frame.angle_deg[2] + INS_PDR_HEADING_OFFSET_DEG);
+#if (APP_HEADING_SOURCE == APP_HEADING_SOURCE_BEACON_IMU)
+            App_StateGetBeaconHeading(&beacon_heading);
+            if ((beacon_heading.valid != 0U) &&
+                ((uint32_t)(now_tick - beacon_heading.last_update_tick) <=
+                 APP_BEACON_HEADING_TIMEOUT_MS))
+            {
+                corrected_heading_deg = task_ins_pdr_normalize_deg(
+                    beacon_heading.yaw_deg + APP_BEACON_HEADING_OFFSET_DEG);
+            }
+#endif
 
             /*PDR更新,不要问为什么在这里*/
             pdr_out = pdr_step_update(&s_pdr_det,
@@ -331,7 +346,6 @@ void Task_Ins_Pdr_Entry(void *argument)
                 corrected_heading_deg, pdr_out.mode);
             ped_heading_deg = task_ins_pdr_snap_heading_deg(ped_heading_deg);
 
-            now_tick = osKernelGetTickCount();
             heading_update_due = ((int32_t)(now_tick - next_heading_update_tick) >= 0) ? 1U : 0U;
 #if (INS_PDR_ENABLE_HEADING_DIAG != 0U)
             if ((int32_t)(now_tick - next_heading_diag_tick) >= 0)

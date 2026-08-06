@@ -9,6 +9,7 @@
  */
 static AppSystemState_t g_systemState;
 static GyroState_t g_gyroState;
+static BeaconHeadingState_t g_beaconHeadingState;
 static NavState_t g_navState;
 static AdcState_t g_adcState;
 static Spo2State_t g_spo2State;
@@ -23,6 +24,7 @@ int32_t App_StateInit(void)
     /* 状态必须在任务启动前清零，防止 UI 显示到未初始化数据。 */
     memset(&g_systemState, 0, sizeof(g_systemState));
     memset(&g_gyroState, 0, sizeof(g_gyroState));
+    memset(&g_beaconHeadingState, 0, sizeof(g_beaconHeadingState));
     memset(&g_navState, 0, sizeof(g_navState));
     memset(&g_adcState, 0, sizeof(g_adcState));
     memset(&g_spo2State, 0, sizeof(g_spo2State));
@@ -114,6 +116,30 @@ void App_StateGetGyro(GyroState_t *state)
 
     osMutexAcquire(g_stateMutex, osWaitForever);
     *state = g_gyroState;
+    osMutexRelease(g_stateMutex);
+}
+
+void App_StateSetBeaconHeading(const BeaconHeadingState_t *state)
+{
+    if ((state == NULL) || (g_stateMutex == NULL))
+    {
+        return;
+    }
+
+    osMutexAcquire(g_stateMutex, osWaitForever);
+    g_beaconHeadingState = *state;
+    osMutexRelease(g_stateMutex);
+}
+
+void App_StateGetBeaconHeading(BeaconHeadingState_t *state)
+{
+    if ((state == NULL) || (g_stateMutex == NULL))
+    {
+        return;
+    }
+
+    osMutexAcquire(g_stateMutex, osWaitForever);
+    *state = g_beaconHeadingState;
     osMutexRelease(g_stateMutex);
 }
 

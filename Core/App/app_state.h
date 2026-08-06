@@ -54,6 +54,13 @@ typedef struct
 
 typedef struct
 {
+    float yaw_deg;                 /* 三端0x53角度帧中的航向角，单位为度 */
+    uint32_t last_update_tick;     /* 仅用于判断无线航向是否超时，不进入通信包 */
+    uint8_t valid;                 /* 已收到至少一帧有效航向 */
+} BeaconHeadingState_t;
+
+typedef struct
+{
     float position_m[3];
     float velocity_mps[3];
     float attitude_rad[3];
@@ -160,6 +167,10 @@ void App_StateAddFault(uint32_t fault_code);
 /* 陀螺仪状态读写 */
 void App_StateSetGyro(const GyroState_t *state);
 void App_StateGetGyro(GyroState_t *state);
+
+/* 三端外接IMU航向状态读写 */
+void App_StateSetBeaconHeading(const BeaconHeadingState_t *state);
+void App_StateGetBeaconHeading(BeaconHeadingState_t *state);
 
 /* 导航状态读写 */
 void App_StateSetNav(const NavState_t *state);

@@ -14,6 +14,7 @@
 #define TASK_SPO2_MOCK_ENABLE        0U  /* 读取真实反射值，心率/血氧仍使用稳定生成值。 */
 #define TASK_SPO2_GENERATED_OUTPUT_ENABLE 1U  /* 确认佩戴后输出稳定生成的心率和血氧。 */
 #define TASK_SPO2_REFLECT_LOG_ENABLE 1U  /* 串口保留反射窗口输出，用于标定佩戴阈值。 */
+#define TASK_SPO2_DEBUG_LOG_ENABLE   0U  /* 无线联调期间关闭血氧模块串口输出。 */
 #define TASK_SPO2_MOCK_PERIOD_MS     1000U
 #define TASK_SPO2_MOCK_HR_MIN        80U
 #define TASK_SPO2_MOCK_HR_MAX        90U
@@ -27,6 +28,15 @@
 #define TASK_SPO2_HR_STABLE_DELTA  10U
 #define TASK_SPO2_HR_CONFIRM_COUNT 3U
 #define TASK_SPO2_HR_STALE_COUNT   3U
+
+#if (TASK_SPO2_DEBUG_LOG_ENABLE != 0U)
+#define Task_Spo2DebugLog App_DebugLog
+#else
+static void Task_Spo2DebugLog(const char *format, ...)
+{
+    (void)format;
+}
+#endif
 
 #if ((APP_SPO2_WEAR_IR_DC_MIN != 0U) && \
      (APP_SPO2_WEAR_RED_DC_MIN != 0U))
@@ -169,12 +179,12 @@ static void Task_Spo2WearEvaluateWindow(void)
 
 #if (TASK_SPO2_REFLECT_LOG_ENABLE != 0U)
     /* W,IR直流,IR波动,红光直流,红光波动,佩戴状态(0未标定/1未佩戴/2已佩戴) */
-    App_DebugLog("W,%lu,%lu,%lu,%lu,%u",
-                 (unsigned long)ir_dc,
-                 (unsigned long)ir_ac,
-                 (unsigned long)red_dc,
-                 (unsigned long)red_ac,
-                 (unsigned int)s_spo2_wear_state);
+    Task_Spo2DebugLog("W,%lu,%lu,%lu,%lu,%u",
+                      (unsigned long)ir_dc,
+                      (unsigned long)ir_ac,
+                      (unsigned long)red_dc,
+                      (unsigned long)red_ac,
+                      (unsigned int)s_spo2_wear_state);
 #elif (TASK_SPO2_WEAR_THRESHOLDS_CONFIGURED == 0U)
     /* 阈值未标定且不输出反射日志时，保留反射统计但不外发。 */
     (void)ir_dc;
@@ -580,7 +590,7 @@ static int32_t Task_Spo2FillGeneratedOutput(Spo2State_t *sample)
             s_spo2_generated_initialized = 0U;
             s_spo2_generated_hr = 0U;
             s_spo2_generated_value = 0U;
-            App_DebugLog("G,0,0");
+            Task_Spo2DebugLog("G,0,0");
             return 1;
         }
         return 0;
@@ -610,9 +620,9 @@ static int32_t Task_Spo2FillGeneratedOutput(Spo2State_t *sample)
     sample->spo2_percent = s_spo2_generated_value;
     sample->heart_rate_valid = 1U;
     sample->spo2_valid = 1U;
-    App_DebugLog("G,%u,%u",
-                 (unsigned int)s_spo2_generated_hr,
-                 (unsigned int)s_spo2_generated_value);
+    Task_Spo2DebugLog("G,%u,%u",
+                      (unsigned int)s_spo2_generated_hr,
+                      (unsigned int)s_spo2_generated_value);
     return 1;
 }
 #endif
@@ -731,16 +741,16 @@ int32_t App_Spo2ReadSample(Spo2State_t *sample)
     s_spo2_has_first_result = 1U;
     s_spo2_samples_since_calc = 0U;
     /* P,心率,心率有效,血氧,血氧有效；用于确认算法与佩戴判断的关系。 */
-    App_DebugLog("P,%ld,%d,%ld,%d",
-                 (long)heart_rate,
-                 (int)hr_valid,
-                 (long)spo2,
-                 (int)spo2_valid);
+    Task_Spo2DebugLog("P,%ld,%d,%ld,%d",
+                      (long)heart_rate,
+                      (int)hr_valid,
+                      (long)spo2,
+                      (int)spo2_valid);
     /* 原始算法结果经过范围和连续性确认后再发布到全局状态。 */
     Task_Spo2FillRawOutput(sample, spo2, spo2_valid, heart_rate, hr_valid);
-    App_DebugLog("H,%u,%u",
-                 (unsigned int)sample->heart_rate_bpm,
-                 (unsigned int)sample->heart_rate_valid);
+    Task_Spo2DebugLog("H,%u,%u",
+                      (unsigned int)sample->heart_rate_bpm,
+                      (unsigned int)sample->heart_rate_valid);
     return 1;
 #endif
 }
@@ -756,7 +766,7 @@ int32_t Task_Spo2InitHardware(void)
     /* 初始化阶段也走 I2C 互斥锁，保持和运行态访问规则一致。 */
     if (osMutexAcquire(g_i2cBusMutex, osWaitForever) != osOK)
     {
-        App_DebugLog("S,I,M");
+        Task_Spo2DebugLog("S,I,M");
         return -1;
     }
 
@@ -764,12 +774,12 @@ int32_t Task_Spo2InitHardware(void)
     if (init_result != 0)
     {
         osMutexRelease(g_i2cBusMutex);
-        App_DebugLog("S,I,%ld", (long)init_result);
+        Task_Spo2DebugLog("S,I,%ld", (long)init_result);
         return -2;
     }
 
     osMutexRelease(g_i2cBusMutex);
-    App_DebugLog("S,I,0");
+    Task_Spo2DebugLog("S,I,0");
     return 0;
 #endif
 }
@@ -859,13 +869,13 @@ void Task_Spo2Entry(void *argument)
         {
             if (result != last_read_error)
             {
-                App_DebugLog("S,E,%ld", (long)result);
+                Task_Spo2DebugLog("S,E,%ld", (long)result);
                 last_read_error = result;
             }
         }
         else if (last_read_error != 0)
         {
-            App_DebugLog("S,R");
+            Task_Spo2DebugLog("S,R");
             last_read_error = 0;
         }
 

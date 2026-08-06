@@ -53,8 +53,15 @@ extern "C" {
 #define APP_SPO2_WEAR_RED_DC_MIN    30000U
 
 #define APP_LORA_PERIOD_MS          1000U       /* LoRa 导航位置发送/收发轮询周期 (1Hz) */
-#define APP_NRF24_POLL_PERIOD_MS    50U         /* 未连接 IRQ，任务轮询 NRF24 接收 FIFO */
+#define APP_NRF24_POLL_PERIOD_MS    10U         /* 未连接 IRQ，需及时排空三端高频接收 FIFO */
 #define APP_RETURN_PERIOD_MS        100U        /* 返航控制周期 (10Hz) */
+
+/* PDR航向源测试开关：切换航向，不改变二端本机IMU的判步输入。 */
+#define APP_HEADING_SOURCE_LOCAL_IMU     0U
+#define APP_HEADING_SOURCE_BEACON_IMU    1U
+#define APP_HEADING_SOURCE               APP_HEADING_SOURCE_BEACON_IMU
+#define APP_BEACON_HEADING_TIMEOUT_MS    200U
+#define APP_BEACON_HEADING_OFFSET_DEG    0.0f
 
 /* 气体报警阈值，传感器标定后只需要调整这里。 */
 #define APP_GAS_NGAS_ALARM_THRESHOLD_PPM 50000.0f
@@ -65,8 +72,9 @@ extern "C" {
 #define APP_BUZZER_INACTIVE_STATE        GPIO_PIN_RESET
 #define APP_BUZZER_TIMER_PERIOD_MS       50U
 
-/* LoRa 当前只预留框架，默认不启用真实收发任务。 */
+/* 联调阶段保留无线任务运行NRF24，暂不初始化SX126x及LoRa收发。 */
 #define APP_LORA_ENABLE_DEFAULT     1U
+#define APP_LORA_RF_ENABLE_DEFAULT  0U
 #define APP_NRF24_ENABLE_DEFAULT    1U
 
 #define APP_INIT_GYRO_DMA           (1UL << 0)  /* 陀螺仪 DMA 接收启动完成 */

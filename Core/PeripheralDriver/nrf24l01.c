@@ -19,14 +19,20 @@
 #define NRF24_REG_RF_SETUP        0x06U
 #define NRF24_REG_STATUS          0x07U
 #define NRF24_REG_OBSERVE_TX      0x08U
+#define NRF24_REG_RPD             0x09U
 #define NRF24_REG_RX_ADDR_P0      0x0AU
+#define NRF24_REG_RX_ADDR_P1      0x0BU
+#define NRF24_REG_RX_ADDR_P2      0x0CU
 #define NRF24_REG_TX_ADDR         0x10U
 #define NRF24_REG_RX_PW_P0        0x11U
+#define NRF24_REG_RX_PW_P1        0x12U
+#define NRF24_REG_RX_PW_P2        0x13U
 #define NRF24_REG_FIFO_STATUS     0x17U
 #define NRF24_REG_DYNPD           0x1CU
 #define NRF24_REG_FEATURE         0x1DU
 
 #define NRF24_CONFIG_EN_CRC       0x08U
+#define NRF24_CONFIG_CRCO         0x04U
 #define NRF24_CONFIG_PWR_UP       0x02U
 #define NRF24_CONFIG_PRIM_RX      0x01U
 
@@ -34,12 +40,14 @@
 #define NRF24_STATUS_TX_DS        0x20U
 #define NRF24_STATUS_MAX_RT       0x10U
 #define NRF24_STATUS_IRQ_MASK     0x70U
+#define NRF24_STATUS_RX_P_NO_MASK 0x0EU
 #define NRF24_FIFO_RX_EMPTY       0x01U
 
 #define NRF24_SETUP_AW_5_BYTES    0x03U
-#define NRF24_SETUP_RETR_VALUE    0x03U
-#define NRF24_RF_SETUP_VALUE      0x0EU
-#define NRF24_TX_TIMEOUT_MS       20U
+#define NRF24_SETUP_RETR_VALUE    0x5AU
+#define NRF24_RF_SETUP_VALUE      0x06U
+#define NRF24_TX_TIMEOUT_MS       40U
+#define NRF24_POWER_ON_DELAY_MS   100U
 
 static Nrf24l01Config_t s_config;
 static uint8_t s_bound;
@@ -148,7 +156,18 @@ static int32_t nrf24_enter_rx(void)
     uint8_t config;
 
     nrf24_ce_write(0U);
-    config = NRF24_CONFIG_EN_CRC | NRF24_CONFIG_PWR_UP | NRF24_CONFIG_PRIM_RX;
+    if (nrf24_write_register_u8(NRF24_REG_EN_RXADDR,
+                                s_config.rx_pipe_mask) != NRF24L01_OK)
+    {
+        return NRF24L01_ERROR_SPI;
+    }
+
+    config = NRF24_CONFIG_EN_CRC | NRF24_CONFIG_CRCO |
+             NRF24_CONFIG_PWR_UP;
+    if (s_config.rx_pipe_mask != 0U)
+    {
+        config |= NRF24_CONFIG_PRIM_RX;
+    }
     result = nrf24_write_register_u8(NRF24_REG_CONFIG, config);
     if (result != NRF24L01_OK)
     {
@@ -156,13 +175,19 @@ static int32_t nrf24_enter_rx(void)
     }
 
     HAL_Delay(2U);
-    nrf24_ce_write(1U);
+    if (s_config.rx_pipe_mask != 0U)
+    {
+        nrf24_ce_write(1U);
+    }
     return NRF24L01_OK;
 }
 
 void Nrf24l01_GetDefaultConfig(Nrf24l01Config_t *config)
 {
-    static const uint8_t default_address[5] = {0x11U, 0x22U, 0x33U, 0x44U, 0x55U};
+    static const uint8_t default_address[NRF24L01_ADDRESS_WIDTH] =
+    {
+        0xA1U, 0xC2U, 0xC2U, 0xC2U, 0xC2U
+    };
 
     if (config == NULL)
     {
@@ -171,7 +196,9 @@ void Nrf24l01_GetDefaultConfig(Nrf24l01Config_t *config)
 
     memset(config, 0, sizeof(*config));
     config->spi_timeout_ms = 20U;
-    config->channel = 2U;
+    config->channel = 76U;
+    config->rx_pipe_mask = NRF24L01_RX_PIPE_1;
+    config->pipe2_lsb = 0xA3U;
     memcpy(config->address, default_address, sizeof(default_address));
 }
 
@@ -186,7 +213,9 @@ int32_t Nrf24l01_Init(const Nrf24l01Config_t *config)
         (config->ce_pin == 0U) ||
         (config->csn_port == NULL) ||
         (config->csn_pin == 0U) ||
-        (config->channel > 125U))
+        (config->channel > 125U) ||
+        ((config->rx_pipe_mask &
+          (uint8_t)~(NRF24L01_RX_PIPE_1 | NRF24L01_RX_PIPE_2)) != 0U))
     {
         return NRF24L01_ERROR_ARGUMENT;
     }
@@ -210,18 +239,28 @@ int32_t Nrf24l01_Init(const Nrf24l01Config_t *config)
     HAL_GPIO_Init(s_config.ce_port, &gpio);
     gpio.Pin = s_config.csn_pin;
     HAL_GPIO_Init(s_config.csn_port, &gpio);
-    HAL_Delay(5U);
+    /* 模块上电后留足内部上电复位时间，避免冷启动偶发读写失败。 */
+    HAL_Delay(NRF24_POWER_ON_DELAY_MS);
 
-    if ((nrf24_write_register_u8(NRF24_REG_CONFIG, NRF24_CONFIG_EN_CRC) != NRF24L01_OK) ||
-        (nrf24_write_register_u8(NRF24_REG_EN_AA, 0x01U) != NRF24L01_OK) ||
-        (nrf24_write_register_u8(NRF24_REG_EN_RXADDR, 0x01U) != NRF24L01_OK) ||
+    if ((nrf24_write_register_u8(NRF24_REG_CONFIG,
+                                  NRF24_CONFIG_EN_CRC |
+                                  NRF24_CONFIG_CRCO) != NRF24L01_OK) ||
+        (nrf24_write_register_u8(NRF24_REG_EN_AA,
+                                 (uint8_t)(0x01U |
+                                           s_config.rx_pipe_mask)) != NRF24L01_OK) ||
+        (nrf24_write_register_u8(NRF24_REG_EN_RXADDR,
+                                 s_config.rx_pipe_mask) != NRF24L01_OK) ||
         (nrf24_write_register_u8(NRF24_REG_SETUP_AW, NRF24_SETUP_AW_5_BYTES) != NRF24L01_OK) ||
         (nrf24_write_register_u8(NRF24_REG_SETUP_RETR, NRF24_SETUP_RETR_VALUE) != NRF24L01_OK) ||
         (nrf24_write_register_u8(NRF24_REG_RF_CH, s_config.channel) != NRF24L01_OK) ||
         (nrf24_write_register_u8(NRF24_REG_RF_SETUP, NRF24_RF_SETUP_VALUE) != NRF24L01_OK) ||
         (nrf24_write_register(NRF24_REG_RX_ADDR_P0, s_config.address, sizeof(s_config.address)) != NRF24L01_OK) ||
+        (nrf24_write_register(NRF24_REG_RX_ADDR_P1, s_config.address, sizeof(s_config.address)) != NRF24L01_OK) ||
+        (nrf24_write_register_u8(NRF24_REG_RX_ADDR_P2, s_config.pipe2_lsb) != NRF24L01_OK) ||
         (nrf24_write_register(NRF24_REG_TX_ADDR, s_config.address, sizeof(s_config.address)) != NRF24L01_OK) ||
         (nrf24_write_register_u8(NRF24_REG_RX_PW_P0, NRF24L01_FRAME_SIZE) != NRF24L01_OK) ||
+        (nrf24_write_register_u8(NRF24_REG_RX_PW_P1, NRF24L01_FRAME_SIZE) != NRF24L01_OK) ||
+        (nrf24_write_register_u8(NRF24_REG_RX_PW_P2, NRF24L01_FRAME_SIZE) != NRF24L01_OK) ||
         (nrf24_write_register_u8(NRF24_REG_DYNPD, 0x00U) != NRF24L01_OK) ||
         (nrf24_write_register_u8(NRF24_REG_FEATURE, 0x00U) != NRF24L01_OK) ||
         (nrf24_write_register_u8(NRF24_REG_STATUS, NRF24_STATUS_IRQ_MASK) != NRF24L01_OK) ||
@@ -251,7 +290,10 @@ int32_t Nrf24l01_Init(const Nrf24l01Config_t *config)
     return NRF24L01_OK;
 }
 
-int32_t Nrf24l01_Send(const uint8_t *data, uint8_t length, uint8_t *retry_count)
+int32_t Nrf24l01_SendTo(const uint8_t address[NRF24L01_ADDRESS_WIDTH],
+                        const uint8_t *data,
+                        uint8_t length,
+                        uint8_t *retry_count)
 {
     uint8_t frame[NRF24L01_FRAME_SIZE];
     uint8_t config;
@@ -260,7 +302,7 @@ int32_t Nrf24l01_Send(const uint8_t *data, uint8_t length, uint8_t *retry_count)
     uint32_t start_tick;
     int32_t result;
 
-    if ((s_ready == 0U) || (data == NULL) ||
+    if ((s_ready == 0U) || (address == NULL) || (data == NULL) ||
         (length == 0U) || (length > NRF24L01_MAX_PAYLOAD_LEN))
     {
         return NRF24L01_ERROR_ARGUMENT;
@@ -275,8 +317,21 @@ int32_t Nrf24l01_Send(const uint8_t *data, uint8_t length, uint8_t *retry_count)
     }
 
     nrf24_ce_write(0U);
-    config = NRF24_CONFIG_EN_CRC | NRF24_CONFIG_PWR_UP;
-    if ((nrf24_write_register_u8(NRF24_REG_CONFIG, config) != NRF24L01_OK) ||
+    config = NRF24_CONFIG_EN_CRC | NRF24_CONFIG_CRCO |
+             NRF24_CONFIG_PWR_UP;
+    if ((nrf24_write_register_u8(NRF24_REG_EN_AA,
+                                 (uint8_t)(0x01U |
+                                           s_config.rx_pipe_mask)) != NRF24L01_OK) ||
+        (nrf24_write_register_u8(NRF24_REG_EN_RXADDR,
+                                 (uint8_t)(0x01U |
+                                           s_config.rx_pipe_mask)) != NRF24L01_OK) ||
+        (nrf24_write_register(NRF24_REG_RX_ADDR_P0,
+                              address,
+                              NRF24L01_ADDRESS_WIDTH) != NRF24L01_OK) ||
+        (nrf24_write_register(NRF24_REG_TX_ADDR,
+                              address,
+                              NRF24L01_ADDRESS_WIDTH) != NRF24L01_OK) ||
+        (nrf24_write_register_u8(NRF24_REG_CONFIG, config) != NRF24L01_OK) ||
         (nrf24_write_register_u8(NRF24_REG_STATUS,
                                  NRF24_STATUS_TX_DS | NRF24_STATUS_MAX_RT) != NRF24L01_OK) ||
         (nrf24_command(NRF24_CMD_FLUSH_TX) != NRF24L01_OK))
@@ -347,17 +402,36 @@ int32_t Nrf24l01_Send(const uint8_t *data, uint8_t length, uint8_t *retry_count)
     return result;
 }
 
-int32_t Nrf24l01_PollReceive(uint8_t *data, uint8_t capacity, uint8_t *length)
+int32_t Nrf24l01_Send(const uint8_t *data,
+                      uint8_t length,
+                      uint8_t *retry_count)
+{
+    return Nrf24l01_SendTo(s_config.address,
+                           data,
+                           length,
+                           retry_count);
+}
+
+int32_t Nrf24l01_PollReceive(uint8_t *data,
+                             uint8_t capacity,
+                             uint8_t *length,
+                             uint8_t *pipe_number)
 {
     uint8_t fifo_status;
     uint8_t frame[NRF24L01_FRAME_SIZE];
     uint8_t payload_length;
+    uint8_t pipe;
+    uint8_t status;
 
     if ((s_ready == 0U) || (data == NULL) || (length == NULL))
     {
         return NRF24L01_ERROR_ARGUMENT;
     }
     *length = 0U;
+    if (pipe_number != NULL)
+    {
+        *pipe_number = 0x07U;
+    }
 
     if (nrf24_read_register(NRF24_REG_FIFO_STATUS, &fifo_status, 1U) != NRF24L01_OK)
     {
@@ -366,6 +440,19 @@ int32_t Nrf24l01_PollReceive(uint8_t *data, uint8_t capacity, uint8_t *length)
     if ((fifo_status & NRF24_FIFO_RX_EMPTY) != 0U)
     {
         return 0;
+    }
+
+    if (nrf24_read_status(&status) != NRF24L01_OK)
+    {
+        return NRF24L01_ERROR_SPI;
+    }
+    pipe = (uint8_t)((status & NRF24_STATUS_RX_P_NO_MASK) >> 1U);
+    if ((pipe < 1U) || (pipe > 2U))
+    {
+        (void)nrf24_command(NRF24_CMD_FLUSH_RX);
+        (void)nrf24_write_register_u8(NRF24_REG_STATUS,
+                                      NRF24_STATUS_RX_DR);
+        return NRF24L01_ERROR_PAYLOAD;
     }
 
     if (nrf24_exchange(NRF24_CMD_R_RX_PAYLOAD,
@@ -389,6 +476,10 @@ int32_t Nrf24l01_PollReceive(uint8_t *data, uint8_t capacity, uint8_t *length)
 
     memcpy(data, &frame[1], payload_length);
     *length = payload_length;
+    if (pipe_number != NULL)
+    {
+        *pipe_number = pipe;
+    }
     return 1;
 }
 
